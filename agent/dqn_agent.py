@@ -44,15 +44,26 @@ class DQNAgent:
 
         self.target_update = 10
 
-    def select_action(self, state):
-        if random.random() < self.epsilon:
-            return random.randrange(self.action_dim)
+    def select_action(self, state, explore=True):
+        is_batch = np.array(state).ndim > 1
+
+        if explore and random.random() < self.epsilon:
+            if is_batch:
+                return [random.randrange(self.action_dim) for _ in range(len(state))]
+            else:
+                return random.randrange(self.action_dim)
         else:
             with torch.no_grad():
-                state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-                q_values = self.policy_net(state)
-                print(q_values)
-                return q_values.argmax().item()
+                state_tensor = torch.FloatTensor(np.array(state)).to(self.device)
+                if not is_batch:
+                    state_tensor = state_tensor.unsqueeze(0)
+
+                q_values = self.policy_net(state_tensor)
+
+                if is_batch:
+                    return q_values.argmax(dim=1).tolist()
+                else:
+                    return q_values.argmax().item()
 
     def store_transition(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
