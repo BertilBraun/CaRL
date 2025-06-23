@@ -11,11 +11,11 @@ class Car:
         # Default car properties
         self.length = 40
         self.width = 20
-        self.max_velocity = 5
-        self.acceleration_rate = 0.2
-        self.braking_rate = 0.1
+        self.max_velocity = 10
+        self.acceleration_rate = 0.3
+        self.braking_rate = 0.2
         self.friction = 0.05
-        self.max_steering_angle = 3
+        self.max_steering_angle = 5
 
     def update(self, acceleration_input: float = 0.0, steering_input: float = 0.0) -> None:
         """

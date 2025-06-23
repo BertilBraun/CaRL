@@ -4,7 +4,7 @@ import numpy as np
 from numba import njit
 from .track import Track
 from utils.geometry import get_line_segment_intersection
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 
 # Guard imports for type-hinting to prevent circular dependencies
 from typing import TYPE_CHECKING
@@ -70,7 +70,7 @@ class GameEnvironment:
         progress_reward = dist_before - dist_now
 
         # 2. Check for events and sparse rewards
-        done = self._check_collision(racer.car)
+        done = self._check_collision(racer)
         checkpoint_reward = self._check_checkpoint_crossing(racer)
 
         # 3. Combine rewards into a final reward value
@@ -109,14 +109,60 @@ class GameEnvironment:
 
         return reward
 
-    def _check_collision(self, car: 'Car') -> bool:
-        for point in self._get_car_corners(car):
-            point_np = np.array([point.x, point.y], dtype=np.float32)
-            if not is_point_in_polygon_numba(point_np, self.outer_points_np) or is_point_in_polygon_numba(
-                point_np, self.inner_points_np
-            ):
-                return True
-        return False
+    def _check_collision(self, racer: 'Racer') -> bool:
+        """
+        Checks if the car is within the local track area, defined by two polygons
+        spanning from the previous-previous to the next checkpoint.
+        A point is valid if it's in *either* of these two polygons.
+        """
+        car_points = self._get_car_corners(racer.car)
+
+        num_checkpoints = len(self.track.checkpoints)
+        next_cp = racer.next_checkpoint
+        prev_cp = (next_cp - 1 + num_checkpoints) % num_checkpoints
+        next_next_cp = (next_cp + 1 + num_checkpoints) % num_checkpoints
+        prev_prev_cp = (next_cp - 2 + num_checkpoints) % num_checkpoints
+
+        # Define the three local track segments
+        p_prev_prev_inner, p_prev_prev_outer = self.track.checkpoints[prev_prev_cp]
+        p_prev_inner, p_prev_outer = self.track.checkpoints[prev_cp]
+        p_next_inner, p_next_outer = self.track.checkpoints[next_cp]
+        p_next_next_inner, p_next_next_outer = self.track.checkpoints[next_next_cp]
+
+        # Polygons are defined in a consistent order (e.g., CCW)
+        local_poly1 = [p_prev_outer, p_prev_prev_outer, p_prev_prev_inner, p_prev_inner]
+        local_poly2 = [p_next_outer, p_prev_outer, p_prev_inner, p_next_inner]
+        local_poly3 = [p_next_next_outer, p_next_outer, p_next_inner, p_next_next_inner]
+
+        for point in car_points:
+            # A car point is valid if it's inside either of the two local polygons
+            in_poly1 = self._point_in_polygon(point, local_poly1)
+            in_poly2 = self._point_in_polygon(point, local_poly2)
+            in_poly3 = self._point_in_polygon(point, local_poly3)
+
+            if not in_poly1 and not in_poly2 and not in_poly3:
+                return True  # Crashed: The point is outside all valid areas.
+
+        return False  # Not crashed
+
+    def _point_in_polygon(self, point: pygame.math.Vector2, polygon: List[pygame.math.Vector2]) -> bool:
+        x, y = point.x, point.y
+        n = len(polygon)
+        inside = False
+        p1 = polygon[0]
+        for i in range(n + 1):
+            p2 = polygon[i % n]
+            if y > min(p1.y, p2.y):
+                if y <= max(p1.y, p2.y):
+                    if x <= max(p1.x, p2.x):
+                        xinters = 0.0
+                        if p1.y != p2.y:
+                            xinters = (y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y) + p1.x
+
+                        if p1.x == p2.x or x <= xinters:
+                            inside = not inside
+            p1 = p2
+        return inside
 
     def _get_car_corners(self, car: 'Car') -> List[pygame.math.Vector2]:
         center = car.position

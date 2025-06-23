@@ -10,8 +10,8 @@ from game.track import Track
 
 def main() -> None:
     # --- Config ---
-    EPISODES = 1000
-    RACERS = 20
+    EPISODES = 100
+    RACERS = 100
     MAX_ITERATIONS = 500
     EPISODES_TO_RENDER = 5
     CHECKPOINT_DIR = 'checkpoints'

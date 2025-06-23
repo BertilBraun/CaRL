@@ -39,12 +39,12 @@ class DQNAgent:
 
         self.batch_size = 64
         self.gamma = 0.99
-        self.epsilon_start = 1.0
+        self.epsilon_start = 0.2
         self.epsilon_end = 0.01
         self.epsilon_decay = 0.995
         self.epsilon = self.epsilon_start
 
-        self.target_update = 10
+        self.target_update = 1
 
     def select_actions(self, states: List[List[float]]) -> List[int]:
         if random.random() < self.epsilon:
