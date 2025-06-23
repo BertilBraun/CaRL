@@ -11,6 +11,7 @@ def main() -> None:
     EPISODES = 2
     RACERS = 5
     MAX_ITERATIONS = 1000
+    RENDER = True
 
     pygame.init()
     screen_width = 1280
@@ -32,14 +33,11 @@ def main() -> None:
 
     agent = DQNAgent(state_dim=len(env._get_state(Racer(track))), action_dim=len(env.action_map))
 
-    episode = 0
-    render_this_episode = True
-
     for episode in range(EPISODES):
         racers = [Racer(track) for _ in range(RACERS)]
 
         for _ in range(MAX_ITERATIONS):
-            if render_this_episode:
+            if RENDER:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         exit()
@@ -70,7 +68,7 @@ def main() -> None:
             agent.experience_replay()
 
             # --- Rendering ---
-            if render_this_episode:
+            if RENDER:
                 env.draw(screen, racers)
                 pygame.display.flip()
                 clock.tick(60)
@@ -84,14 +82,13 @@ def main() -> None:
             agent.update_target_net()
 
         # Log results for the episode
-        avg_reward = sum([r.total_reward for r in racers]) / len(racers)
-        avg_laps = sum([r.lap_count for r in racers]) / len(racers)
+        avg_reward = sum([r.total_reward for r in racers]) / RACERS
+        avg_laps = sum([r.lap_count for r in racers]) / RACERS
         print(
             f'Episode {episode + 1}/{EPISODES} | Avg Reward: {avg_reward:.2f} | Avg Laps: {avg_laps:.2f} | Epsilon: {agent.epsilon:.2f}'
         )
 
-    if screen:
-        pygame.quit()
+    pygame.quit()
 
 
 if __name__ == '__main__':

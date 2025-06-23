@@ -3,7 +3,7 @@ import math
 import numpy as np
 from .track import Track
 from utils.geometry import get_line_segment_intersection
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Dict
 
 # Guard imports for type-hinting to prevent circular dependencies
 from typing import TYPE_CHECKING
@@ -29,15 +29,25 @@ class GameEnvironment:
         acceleration_input, steering_input = self.action_map[action]
         racer.car.update(acceleration_input, steering_input)
 
-        # Check for events
+        # --- Reward Calculation ---
+        # 1. Calculate reward for progressing towards the current next checkpoint
+        next_checkpoint_line = self.track.checkpoints[racer.next_checkpoint]
+        checkpoint_center = (next_checkpoint_line[0] + next_checkpoint_line[1]) / 2
+        dist_before = racer.last_pos.distance_to(checkpoint_center)
+        dist_now = racer.car.position.distance_to(checkpoint_center)
+        progress_reward = dist_before - dist_now
+
+        # 2. Check for events and sparse rewards
         done = self._check_collision(racer.car)
         checkpoint_reward = self._check_checkpoint_crossing(racer)
 
-        # Calculate reward and get new state
-        reward = self._calculate_reward(done, checkpoint_reward)
+        # 3. Combine rewards into a final reward value
+        reward = self._calculate_reward(done, checkpoint_reward, progress_reward)
+
+        # --- State and Updates ---
         state = self._get_state(racer)
 
-        # Update racer state
+        # Update racer state for the next step
         racer.last_pos = racer.car.position.copy()
         racer.time_since_checkpoint += 1
 
@@ -157,13 +167,13 @@ class GameEnvironment:
             lines.append((self.track.inner_points[i - 1], self.track.inner_points[i]))
         return lines
 
-    def _calculate_reward(self, done: bool, checkpoint_reward: float) -> float:
+    def _calculate_reward(self, done: bool, checkpoint_reward: float, progress_reward: float) -> float:
         if done:
-            return -100
+            return -100.0
 
         time_penalty = -0.1
 
-        return checkpoint_reward + time_penalty
+        return checkpoint_reward + progress_reward + time_penalty
 
     def _get_state(self, racer: 'Racer') -> List[float]:
         lidar_readings, _ = self._get_lidar_readings(racer.car)
