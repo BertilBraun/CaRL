@@ -18,3 +18,5 @@ class Racer:
         self.last_pos = self.car.position.copy()
         self.time_since_checkpoint = 0
         self.current_state: List[float] = []
+        self.progress_history: List[float] = []
+        self.time_stalled: int = 0

@@ -1,7 +1,7 @@
 import numba
-import numpy as np
-from typing import Tuple, Optional
 import pygame
+import numpy as np
+from typing import Tuple
 
 
 def vector_to_numpy(v: pygame.math.Vector2) -> np.ndarray:
@@ -128,3 +128,20 @@ def point_in_polygon_fast(point: np.ndarray, polygon: np.ndarray) -> bool:
                         inside = not inside
         p1 = p2
     return inside
+
+
+def find_closest_point_on_segment(
+    p: pygame.math.Vector2, a: pygame.math.Vector2, b: pygame.math.Vector2
+) -> pygame.math.Vector2:
+    """Finds the closest point on a line segment to a given point."""
+    line_vec = b - a
+    p_vec = p - a
+    line_len_sq = line_vec.length_squared()
+
+    if line_len_sq == 0:
+        return a
+
+    t = p_vec.dot(line_vec) / line_len_sq
+    t = max(0, min(1, t))  # Clamp to segment
+
+    return a + t * line_vec

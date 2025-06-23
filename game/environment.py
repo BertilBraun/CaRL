@@ -13,6 +13,10 @@ if TYPE_CHECKING:
 
 
 class GameEnvironment:
+    MIN_PROGRESS_THRESHOLD = 0.001
+    STALLED_WINDOW = 30
+    MAX_STALLED_TIME = 60
+
     def __init__(self, track: Track, timeout_to_reach_next_checkpoint: int) -> None:
         self.track = track
         self.timeout_to_reach_next_checkpoint = timeout_to_reach_next_checkpoint
@@ -41,10 +45,34 @@ class GameEnvironment:
 
         # 2. Check for events and sparse rewards
         done = self.track.check_collision(racer.car, racer.next_checkpoint)
+
         checkpoint_reward = self._check_checkpoint_crossing(racer)
 
-        # 3. Combine rewards into a final reward value
-        reward = self._calculate_reward(done, checkpoint_reward, progress_reward)
+        # 2a. Check if the racer is stalled or moving backwards
+        current_progress = self.track.get_progress_on_track(racer.car.position)
+        racer.progress_history.append(current_progress)
+        if len(racer.progress_history) > self.STALLED_WINDOW:
+            racer.progress_history.pop(0)
+
+        if len(racer.progress_history) == self.STALLED_WINDOW:
+            progress_in_window = racer.progress_history[-1] - racer.progress_history[0]
+            if progress_in_window < self.MIN_PROGRESS_THRESHOLD:
+                racer.time_stalled += 1
+            else:
+                racer.time_stalled = 0
+
+        if racer.time_stalled > self.MAX_STALLED_TIME:
+            done = True
+            progress_reward = -200.0
+
+        # 3. Calculate speed for reward and state
+        velocity_vec = racer.car.position - racer.last_pos
+        angle_rad = math.radians(racer.car.angle)
+        forward_vec = pygame.math.Vector2(math.cos(angle_rad), -math.sin(angle_rad))
+        forward_speed = velocity_vec.dot(forward_vec)
+
+        # 4. Combine rewards into a final reward value
+        reward = self._calculate_reward(done, checkpoint_reward, progress_reward, forward_speed)
 
         # --- State and Updates ---
         state = self._get_state(racer)
@@ -84,23 +112,26 @@ class GameEnvironment:
 
         return reward
 
-    def _calculate_reward(self, done: bool, checkpoint_reward: float, progress_reward: float) -> float:
+    def _calculate_reward(
+        self, done: bool, checkpoint_reward: float, progress_reward: float, forward_speed: float
+    ) -> float:
         if done:
             return -100.0
 
         time_penalty = -0.1
+        speed_reward = forward_speed * 0.1
+        speed_penalty = -0.5 if forward_speed < 0.1 else 0
 
-        return checkpoint_reward + progress_reward + time_penalty
+        return checkpoint_reward + progress_reward + time_penalty + speed_reward + speed_penalty
 
     def _get_state(self, racer: 'Racer') -> List[float]:
         lidar_readings, _ = self.track.get_lidar_readings(racer.car)
 
-        # Normalize velocity into forward and sideways components relative to car's orientation
         velocity_vec = racer.car.position - racer.last_pos
-
         angle_rad = math.radians(racer.car.angle)
         forward_vec = pygame.math.Vector2(math.cos(angle_rad), -math.sin(angle_rad))
 
+        # Normalize velocity into forward and sideways components relative to car's orientation
         # Project velocity vector onto forward vector to get forward speed
         forward_speed = velocity_vec.dot(forward_vec) / racer.car.max_velocity
 
@@ -113,7 +144,7 @@ class GameEnvironment:
         self.track.draw(screen)
 
         for racer in racers:
-            racer.car.draw(screen)
+            racer.car.draw(screen, (255, 0, 0) if racer.done else (0, 255, 0))
 
             # Draw lidar readings
             _, lidar_end_points = self.track.get_lidar_readings(racer.car)

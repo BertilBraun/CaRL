@@ -6,6 +6,7 @@ from utils.geometry import (
     vector_to_numpy,
     get_lidar_readings_fast,
     point_in_polygon_fast,
+    find_closest_point_on_segment,
 )
 from typing import List, Tuple, TYPE_CHECKING
 import numpy as np
@@ -27,7 +28,7 @@ class Track:
             while index < len(self.nodes) - 1:
                 p1 = self.nodes[index]
                 p2 = self.nodes[index + 1]
-                if p1.distance_to(p2) > 50:
+                if p1.distance_to(p2) > 100:
                     # Insert a new node at the midpoint of the segment
                     mid_point = p1.lerp(p2, 0.5)
                     self.nodes.insert(index + 1, mid_point)
@@ -208,6 +209,35 @@ class Track:
         angle = -math.degrees(math.atan2(segment_vector.y, segment_vector.x))
 
         return point, angle, next_checkpoint_index
+
+    def get_progress_on_track(self, point: pygame.math.Vector2) -> float:
+        """
+        Calculates the progress of a point along the track's centerline, returned as a fraction of total length.
+        """
+        min_dist_sq = float('inf')
+        closest_proj_point = None
+        closest_segment_index = -1
+
+        # Find the closest segment on the track's centerline
+        for i in range(len(self.nodes) - 1):
+            p1 = self.nodes[i]
+            p2 = self.nodes[i + 1]
+            proj_point = find_closest_point_on_segment(point, p1, p2)
+            dist_sq = point.distance_squared_to(proj_point)
+
+            if dist_sq < min_dist_sq:
+                min_dist_sq = dist_sq
+                closest_proj_point = proj_point
+                closest_segment_index = i
+
+        if closest_segment_index == -1 or closest_proj_point is None:
+            return 0.0
+
+        # Calculate the distance along the track to this point
+        dist_along_track = self.cumulative_lengths[closest_segment_index]
+        dist_along_track += self.nodes[closest_segment_index].distance_to(closest_proj_point)
+
+        return dist_along_track / self.total_length
 
     def draw(self, screen: pygame.Surface) -> None:
         track_color = (100, 100, 100)

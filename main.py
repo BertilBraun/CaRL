@@ -77,7 +77,7 @@ def main() -> None:
                     if event.type == pygame.QUIT:
                         exit()
 
-                env.draw(screen, active_racers)
+                env.draw(screen, racers)
                 pygame.display.flip()
                 clock.tick(60)
 

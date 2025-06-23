@@ -1,7 +1,8 @@
+from typing import Tuple
 import pygame
 import math
 import numpy as np
-from utils.geometry import vector_to_numpy
+from utils.geometry import numpy_to_vector, vector_to_numpy
 
 
 class Car:
@@ -52,7 +53,7 @@ class Car:
 
     def get_corners_np(self) -> np.ndarray:
         center = vector_to_numpy(self.position)
-        angle_rad = np.radians(self.angle)
+        angle_rad = np.radians(-self.angle)
 
         half_len = self.length / 2
         half_wid = self.width / 2
@@ -74,9 +75,9 @@ class Car:
         rotated_corners = corners @ rotation_matrix.T
         return rotated_corners + center
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen: pygame.Surface, color: Tuple[int, int, int] = (255, 0, 0)) -> None:
         car_surface = pygame.Surface((self.length, self.width), pygame.SRCALPHA)
-        car_surface.fill((255, 0, 0))  # Red car
+        car_surface.fill(color)
 
         # Add a line to indicate front
         pygame.draw.line(car_surface, (0, 0, 0), (self.length / 2, self.width / 2), (self.length, self.width / 2), 3)
@@ -84,3 +85,7 @@ class Car:
         rotated_car = pygame.transform.rotate(car_surface, self.angle)
         rect = rotated_car.get_rect(center=self.position)
         screen.blit(rotated_car, rect)
+
+        # for debugging
+        # for p in self.get_corners_np():
+        #     pygame.draw.circle(screen, (0, 0, 0), numpy_to_vector(p), 5)
