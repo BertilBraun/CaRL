@@ -1,5 +1,7 @@
 import pygame
 import math
+import numpy as np
+from utils.geometry import vector_to_numpy
 
 
 class Car:
@@ -47,6 +49,30 @@ class Car:
         # Update position vector
         self.position.x += self.velocity * math.cos(math.radians(self.angle))
         self.position.y -= self.velocity * math.sin(math.radians(self.angle))
+
+    def get_corners_np(self) -> np.ndarray:
+        center = vector_to_numpy(self.position)
+        angle_rad = np.radians(self.angle)
+
+        half_len = self.length / 2
+        half_wid = self.width / 2
+
+        corners = np.array(
+            [
+                [-half_len, -half_wid],
+                [half_len, -half_wid],
+                [half_len, half_wid],
+                [-half_len, half_wid],
+            ],
+            dtype=np.float32,
+        )
+
+        rotation_matrix = np.array(
+            [[np.cos(angle_rad), -np.sin(angle_rad)], [np.sin(angle_rad), np.cos(angle_rad)]], dtype=np.float32
+        )
+
+        rotated_corners = corners @ rotation_matrix.T
+        return rotated_corners + center
 
     def draw(self, screen: pygame.Surface) -> None:
         car_surface = pygame.Surface((self.length, self.width), pygame.SRCALPHA)

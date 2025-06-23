@@ -1,6 +1,6 @@
 import numba
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Optional
 import pygame
 
 
@@ -14,28 +14,57 @@ def numpy_to_vector(a: np.ndarray) -> pygame.math.Vector2:
     return pygame.math.Vector2(a[0], a[1])
 
 
-@numba.njit
-def get_line_segment_intersection_fast(
-    p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray
-) -> np.ndarray | None:
+def get_line_segment_intersection(
+    p1: pygame.math.Vector2, p2: pygame.math.Vector2, p3: pygame.math.Vector2, p4: pygame.math.Vector2
+) -> pygame.math.Vector2 | None:
     """
     Calculates the intersection point of two finite line segments using Numba.
     :return: A Vector2 of the intersection point, or None if they do not intersect.
     """
-    den = (p1[0] - p2[0]) * (p3[1] - p4[1]) - (p1[1] - p2[1]) * (p3[0] - p4[0])
+    den = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x)
     if den == 0:
         return None
 
-    t_num = (p1[0] - p3[0]) * (p3[1] - p4[1]) - (p1[1] - p3[1]) * (p3[0] - p4[0])
+    t_num = (p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)
     t = t_num / den
 
-    u_num = -((p1[0] - p2[0]) * (p1[1] - p3[1]) - (p1[1] - p2[1]) * (p1[0] - p3[0]))
+    u_num = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x))
     u = u_num / den
 
     if 0 < t < 1 and 0 < u < 1:
         return p1 + t * (p2 - p1)
 
     return None
+
+
+@numba.njit
+def get_line_segment_intersection_fast(p1: np.ndarray, p2: np.ndarray, p3s: np.ndarray, p4s: np.ndarray):
+    """
+    Calculates the intersection of a line segment with a batch of other line segments.
+    """
+    den = (p1[0] - p2[0]) * (p3s[:, 1] - p4s[:, 1]) - (p1[1] - p2[1]) * (p3s[:, 0] - p4s[:, 0])
+
+    t_num = (p1[0] - p3s[:, 0]) * (p3s[:, 1] - p4s[:, 1]) - (p1[1] - p3s[:, 1]) * (p3s[:, 0] - p4s[:, 0])
+    u_num = -((p1[0] - p2[0]) * (p1[1] - p3s[:, 1]) - (p1[1] - p2[1]) * (p1[0] - p3s[:, 0]))
+
+    # Using a small epsilon to avoid division by zero
+    den[np.abs(den) < 1e-6] = 1e-6
+
+    t = t_num / den
+    u = u_num / den
+
+    mask = (t > 0) & (t < 1) & (u > 0) & (u < 1)
+
+    if not np.any(mask):
+        return None, None
+
+    valid_t = t[mask]
+    min_t_idx = np.argmin(valid_t)
+
+    closest_intersection = p1 + valid_t[min_t_idx] * (p2 - p1)
+    distance = np.linalg.norm(closest_intersection - p1)
+
+    return closest_intersection, distance
 
 
 @numba.njit
@@ -48,12 +77,15 @@ def get_lidar_readings_fast(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Calculates lidar readings for a car against track boundaries using Numba.
+    This version is vectorized to check all track lines at once for each ray.
     """
     angles = np.linspace(-90, 90, num_rays)
     readings = np.full(num_rays, ray_length, dtype=np.float32)
     lidar_end_points = np.zeros((num_rays, 2), dtype=np.float32)
 
     start_pos = car_position
+    p3s = track_lines[:, 0, :]
+    p4s = track_lines[:, 1, :]
 
     ray_angles_rad = np.radians(car_angle + angles)
     cos_rays = np.cos(ray_angles_rad)
@@ -62,25 +94,14 @@ def get_lidar_readings_fast(
     for i in range(num_rays):
         end_pos_long = start_pos + np.array([cos_rays[i] * ray_length, -sin_rays[i] * ray_length])
 
-        closest_dist = ray_length
-        closest_point = end_pos_long
+        intersection, distance = get_line_segment_intersection_fast(start_pos, end_pos_long, p3s, p4s)
 
-        p1 = start_pos
-        p2 = end_pos_long
-
-        for j in range(len(track_lines)):
-            p3 = track_lines[j, 0, :]
-            p4 = track_lines[j, 1, :]
-
-            intersection = get_line_segment_intersection_fast(p1, p2, p3, p4)
-            if intersection is not None:
-                dist = np.linalg.norm(start_pos - intersection)
-                if dist < closest_dist:
-                    closest_dist = dist
-                    closest_point = intersection
-
-        readings[i] = closest_dist
-        lidar_end_points[i] = closest_point
+        if intersection is not None:
+            readings[i] = distance
+            lidar_end_points[i, :] = intersection
+        else:
+            readings[i] = ray_length
+            lidar_end_points[i, :] = end_pos_long
 
     return readings / ray_length, lidar_end_points
 
