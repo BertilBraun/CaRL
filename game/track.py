@@ -1,6 +1,7 @@
 import pygame
 import math
-from utils.geometry import get_infinite_line_intersection
+import numpy as np
+from utils.geometry import get_line_segment_intersection_fast
 from typing import List, Tuple
 
 
@@ -82,12 +83,26 @@ class Track:
             inner2_p1 = p_curr - n_out * self.width / 2
             inner2_p2 = p_next - n_out * self.width / 2
 
-            outer_corner = get_infinite_line_intersection(outer1_p1, outer1_p2, outer2_p1, outer2_p2) or (
-                p_curr + n_in * self.width / 2
-            )
-            inner_corner = get_infinite_line_intersection(inner1_p1, inner1_p2, inner2_p1, inner2_p2) or (
-                p_curr - n_in * self.width / 2
-            )
+            outer1_p1_np = np.array([outer1_p1.x, outer1_p1.y], dtype=np.float32)
+            outer1_p2_np = np.array([outer1_p2.x, outer1_p2.y], dtype=np.float32)
+            outer2_p1_np = np.array([outer2_p1.x, outer2_p1.y], dtype=np.float32)
+            outer2_p2_np = np.array([outer2_p2.x, outer2_p2.y], dtype=np.float32)
+            inner1_p1_np = np.array([inner1_p1.x, inner1_p1.y], dtype=np.float32)
+            inner1_p2_np = np.array([inner1_p2.x, inner1_p2.y], dtype=np.float32)
+            inner2_p1_np = np.array([inner2_p1.x, inner2_p1.y], dtype=np.float32)
+            inner2_p2_np = np.array([inner2_p2.x, inner2_p2.y], dtype=np.float32)
+
+            outer_corner_np = get_line_segment_intersection_fast(outer1_p1_np, outer1_p2_np, outer2_p1_np, outer2_p2_np)
+            if outer_corner_np is not None:
+                outer_corner = pygame.math.Vector2(outer_corner_np[0], outer_corner_np[1])
+            else:
+                outer_corner = p_curr + n_in * self.width / 2
+
+            inner_corner_np = get_line_segment_intersection_fast(inner1_p1_np, inner1_p2_np, inner2_p1_np, inner2_p2_np)
+            if inner_corner_np is not None:
+                inner_corner = pygame.math.Vector2(inner_corner_np[0], inner_corner_np[1])
+            else:
+                inner_corner = p_curr - n_in * self.width / 2
 
             self.outer_points.append(outer_corner)
             self.inner_points.append(inner_corner)
