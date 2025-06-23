@@ -1,89 +1,85 @@
 import pygame
+from typing import List, Tuple
+
 from game.environment import GameEnvironment
 from agent.racer import Racer
 from agent.dqn_agent import DQNAgent
+from game.track import Track
 
 
-def main():
-    # --- Config ---
-    NUM_WORKERS = 8  # Number of racers to simulate in parallel
-    width, height = 1280, 720
-    num_episodes = 1000
-    render_every_n_episodes = 10  # Set to 0 to disable rendering
+def main() -> None:
+    EPISODES = 2
+    RACERS = 5
+    MAX_ITERATIONS = 1000
 
-    # --- Setup Environment ---
-    track_nodes = [(300, 570), (200, 360), (300, 150), (980, 150), (1080, 360), (980, 570)]
-    env = GameEnvironment(track_nodes=track_nodes)
+    pygame.init()
+    screen_width = 1280
+    screen_height = 720
+    screen = pygame.display.set_mode((screen_width, screen_height))
+    pygame.display.set_caption('Car RL')
+    clock = pygame.time.Clock()
 
-    # --- Setup Agent (The Brain) ---
-    state_dim = 6  # 1 for velocity, 5 for lidar
-    agent = DQNAgent(state_dim=state_dim, action_dim=len(env.action_map))
+    track_nodes: List[Tuple[float, float]] = [
+        (300.0, 570.0),
+        (200.0, 360.0),
+        (300.0, 150.0),
+        (980.0, 150.0),
+        (1080.0, 360.0),
+        (980.0, 570.0),
+    ]
+    track = Track(track_nodes)
+    env = GameEnvironment(track)
 
-    # --- Setup Racers (The Actors) ---
-    car_config = {}  # Use default car properties for now
-    racers = [Racer(car_config, env.track) for _ in range(NUM_WORKERS)]
+    agent = DQNAgent(state_dim=len(env._get_state(Racer(track))), action_dim=len(env.action_map))
 
-    # --- Pygame setup (optional) ---
-    screen = None
-    clock = None
-    if render_every_n_episodes > 0:
-        pygame.init()
-        screen = pygame.display.set_mode((width, height))
-        pygame.display.set_caption('Car RL')
-        clock = pygame.time.Clock()
+    episode = 0
+    render_this_episode = True
 
-    # --- Training Loop ---
-    running = True
-    for episode in range(num_episodes):
-        if not running:
-            break
+    for episode in range(EPISODES):
+        racers = [Racer(track) for _ in range(RACERS)]
 
-        for racer in racers:
-            racer.reset()
-
-        render_this_episode = render_every_n_episodes > 0 and episode % render_every_n_episodes == 0
-
-        while True:  # Loop for simulation steps
+        for _ in range(MAX_ITERATIONS):
             if render_this_episode:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
-                        running = False
-                if not running:
-                    break
+                        exit()
 
-            # --- Batch process all active racers ---
-            active_racers = [r for r in racers if not r.done]
-            if not active_racers:
-                break  # End episode if all racers are done
+            # --- Agent-Environment Interaction ---
+            # 1. Get states from all active racers
+            states = [env._get_state(r) for r in racers]
 
-            # 1. Collect states from active racers
-            states = [env._get_state(r.car) for r in active_racers]
-
-            # 2. Agent selects actions for the batch
+            # 2. Get actions from the agent (batched)
             actions = agent.select_action(states)
 
-            # 3. Step environment and store transitions for each racer
-            for i, racer in enumerate(active_racers):
+            # 3. Apply actions and get results
+            for i, racer in enumerate(racers):
+                # The previous state is what we stored earlier
+                prev_state = states[i]
                 action = actions[i]
-                state = states[i]
 
+                # The environment steps forward
                 next_state, reward, done = env.step(racer, action)
+
+                # Store the transition in the agent's memory
+                agent.store_transition(prev_state, action, reward, next_state, done)
                 racer.done = done
-                racer.total_reward += reward
 
-                agent.store_transition(state, action, reward, next_state, done)
+            racers = [r for r in racers if not r.done]
 
-            # 4. Perform one learning step
+            # 4. Perform one step of learning
             agent.experience_replay()
 
+            # --- Rendering ---
             if render_this_episode:
                 env.draw(screen, racers)
                 pygame.display.flip()
-                if clock:
-                    clock.tick(60)
+                clock.tick(60)
 
-        # After an episode, update the agent
-        agent.decay_epsilon()
+            if not racers:
+                break
+
+        print(f'Episode {episode} finished. All racers crashed or finished.')
+        agent.decay_epsilon()  # Decay epsilon at the end of an episode
         if episode > 0 and episode % agent.target_update == 0:
             agent.update_target_net()
 
@@ -91,7 +87,7 @@ def main():
         avg_reward = sum([r.total_reward for r in racers]) / len(racers)
         avg_laps = sum([r.lap_count for r in racers]) / len(racers)
         print(
-            f'Episode {episode + 1}/{num_episodes} | Avg Reward: {avg_reward:.2f} | Avg Laps: {avg_laps:.2f} | Epsilon: {agent.epsilon:.2f}'
+            f'Episode {episode + 1}/{EPISODES} | Avg Reward: {avg_reward:.2f} | Avg Laps: {avg_laps:.2f} | Epsilon: {agent.epsilon:.2f}'
         )
 
     if screen:

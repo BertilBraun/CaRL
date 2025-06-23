@@ -1,7 +1,10 @@
 import pygame
+from typing import Optional
 
 
-def get_infinite_line_intersection(p1, p2, p3, p4):
+def get_infinite_line_intersection(
+    p1: pygame.math.Vector2, p2: pygame.math.Vector2, p3: pygame.math.Vector2, p4: pygame.math.Vector2
+) -> Optional[pygame.math.Vector2]:
     """
     Calculates the intersection point of two infinite lines.
     :return: A Vector2 of the intersection point, or None if lines are parallel.
@@ -16,7 +19,9 @@ def get_infinite_line_intersection(p1, p2, p3, p4):
     return pygame.math.Vector2(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y))
 
 
-def get_line_segment_intersection(p1, p2, p3, p4):
+def get_line_segment_intersection(
+    p1: pygame.math.Vector2, p2: pygame.math.Vector2, p3: pygame.math.Vector2, p4: pygame.math.Vector2
+) -> Optional[pygame.math.Vector2]:
     """
     Calculates the intersection point of two finite line segments.
     :return: A Vector2 of the intersection point, or None if they do not intersect.

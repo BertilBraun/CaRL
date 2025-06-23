@@ -3,7 +3,7 @@ import math
 
 
 class Car:
-    def __init__(self, x, y, angle=0.0, **kwargs):
+    def __init__(self, x: float, y: float, angle: float = 0.0) -> None:
         self.position = pygame.math.Vector2(x, y)
         self.velocity = 0.0
         self.angle = angle
@@ -17,11 +17,7 @@ class Car:
         self.friction = 0.05
         self.max_steering_angle = 3
 
-        # Allow overriding defaults with kwargs
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-    def update(self, acceleration_input=0, steering_input=0):
+    def update(self, acceleration_input: int = 0, steering_input: int = 0) -> None:
         """
         Update car state based on inputs.
         :param acceleration_input: 1 for accelerate, -1 for brake, 0 for coast.
@@ -54,7 +50,7 @@ class Car:
 
         print(self.position, self.angle, self.velocity, acceleration_input, steering_input)
 
-    def draw(self, screen):
+    def draw(self, screen: pygame.Surface) -> None:
         car_surface = pygame.Surface((self.length, self.width), pygame.SRCALPHA)
         car_surface.fill((255, 0, 0))  # Red car
 

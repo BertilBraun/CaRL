@@ -4,16 +4,17 @@ import torch.optim as optim
 import random
 import numpy as np
 from collections import deque
+from typing import List, Deque, Tuple, Union
 
 
 class DQN(nn.Module):
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_dim: int, output_dim: int) -> None:
         super(DQN, self).__init__()
         self.fc1 = nn.Linear(input_dim, 128)
         self.fc2 = nn.Linear(128, 128)
         self.fc3 = nn.Linear(128, output_dim)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         x = self.fc3(x)
@@ -21,7 +22,7 @@ class DQN(nn.Module):
 
 
 class DQNAgent:
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, state_dim: int, action_dim: int) -> None:
         self.state_dim = state_dim
         self.action_dim = action_dim
 
@@ -33,7 +34,7 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=0.001)
-        self.memory = deque(maxlen=10000)
+        self.memory: Deque[Tuple[List[float], int, float, List[float], bool]] = deque(maxlen=10000)
 
         self.batch_size = 64
         self.gamma = 0.99
@@ -44,31 +45,21 @@ class DQNAgent:
 
         self.target_update = 10
 
-    def select_action(self, state, explore=True):
-        is_batch = np.array(state).ndim > 1
-
+    def select_action(self, states: List[List[float]], explore: bool = True) -> List[int]:
         if explore and random.random() < self.epsilon:
-            if is_batch:
-                return [random.randrange(self.action_dim) for _ in range(len(state))]
-            else:
-                return random.randrange(self.action_dim)
+            return [random.randrange(self.action_dim) for _ in range(len(states))]
         else:
             with torch.no_grad():
-                state_tensor = torch.FloatTensor(np.array(state)).to(self.device)
-                if not is_batch:
-                    state_tensor = state_tensor.unsqueeze(0)
-
+                state_tensor = torch.FloatTensor(np.array(states)).to(self.device)
                 q_values = self.policy_net(state_tensor)
+                return q_values.argmax(dim=1).tolist()
 
-                if is_batch:
-                    return q_values.argmax(dim=1).tolist()
-                else:
-                    return q_values.argmax().item()
-
-    def store_transition(self, state, action, reward, next_state, done):
+    def store_transition(
+        self, state: List[float], action: int, reward: float, next_state: List[float], done: bool
+    ) -> None:
         self.memory.append((state, action, reward, next_state, done))
 
-    def experience_replay(self):
+    def experience_replay(self) -> None:
         if len(self.memory) < self.batch_size:
             return
 
@@ -94,8 +85,8 @@ class DQNAgent:
         loss.backward()
         self.optimizer.step()
 
-    def update_target_net(self):
+    def update_target_net(self) -> None:
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
-    def decay_epsilon(self):
+    def decay_epsilon(self) -> None:
         self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)

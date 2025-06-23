@@ -3,12 +3,20 @@ import math
 import numpy as np
 from .track import Track
 from utils.geometry import get_line_segment_intersection
+from typing import List, Tuple, Optional, Dict, Any
+
+# Guard imports for type-hinting to prevent circular dependencies
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agent.racer import Racer
+    from game.car import Car
 
 
 class GameEnvironment:
-    def __init__(self, track_nodes=None):
-        self.track = Track(nodes=track_nodes)
-        self.action_map = {
+    def __init__(self, track: Track) -> None:
+        self.track = track
+        self.action_map: Dict[int, Tuple[int, int]] = {
             0: (0, 0),  # coast
             1: (1, 0),  # accelerate
             2: (-1, 0),  # brake
@@ -16,7 +24,7 @@ class GameEnvironment:
             4: (0, -1),  # steer right
         }
 
-    def step(self, racer, action):
+    def step(self, racer: 'Racer', action: int) -> Tuple[List[float], float, bool]:
         # Update car physics
         acceleration_input, steering_input = self.action_map[action]
         racer.car.update(acceleration_input, steering_input)
@@ -27,7 +35,7 @@ class GameEnvironment:
 
         # Calculate reward and get new state
         reward = self._calculate_reward(done, checkpoint_reward)
-        state = self._get_state(racer.car)
+        state = self._get_state(racer)
 
         # Update racer state
         racer.last_pos = racer.car.position.copy()
@@ -38,7 +46,7 @@ class GameEnvironment:
 
         return state, reward, done
 
-    def _check_checkpoint_crossing(self, racer):
+    def _check_checkpoint_crossing(self, racer: 'Racer') -> float:
         reward = 0
         p1 = racer.last_pos
         p2 = racer.car.position
@@ -59,7 +67,7 @@ class GameEnvironment:
 
         return reward
 
-    def _check_collision(self, car):
+    def _check_collision(self, car: 'Car') -> bool:
         car_corners = self._get_car_corners(car)
         for point in car_corners:
             if not self._point_in_polygon(point, self.track.outer_points) or self._point_in_polygon(
@@ -68,7 +76,7 @@ class GameEnvironment:
                 return True
         return False
 
-    def _point_in_polygon(self, point, polygon):
+    def _point_in_polygon(self, point: pygame.math.Vector2, polygon: List[pygame.math.Vector2]) -> bool:
         x, y = point.x, point.y
         n = len(polygon)
         inside = False
@@ -87,7 +95,7 @@ class GameEnvironment:
             p1x, p1y = p2x, p2y
         return inside
 
-    def _get_car_corners(self, car):
+    def _get_car_corners(self, car: 'Car') -> List[pygame.math.Vector2]:
         center = car.position
         length = car.length
         width = car.width
@@ -108,7 +116,7 @@ class GameEnvironment:
 
         return corners
 
-    def _get_lidar_readings(self, car):
+    def _get_lidar_readings(self, car: 'Car') -> Tuple[List[float], List[pygame.math.Vector2]]:
         num_rays = 5
         ray_length = 300.0
         angles = np.linspace(-90, 90, num_rays)
@@ -141,7 +149,7 @@ class GameEnvironment:
 
         return readings, lidar_end_points
 
-    def _get_track_lines(self):
+    def _get_track_lines(self) -> List[Tuple[pygame.math.Vector2, pygame.math.Vector2]]:
         lines = []
         for i in range(len(self.track.outer_points)):
             lines.append((self.track.outer_points[i - 1], self.track.outer_points[i]))
@@ -149,7 +157,7 @@ class GameEnvironment:
             lines.append((self.track.inner_points[i - 1], self.track.inner_points[i]))
         return lines
 
-    def _calculate_reward(self, done, checkpoint_reward):
+    def _calculate_reward(self, done: bool, checkpoint_reward: float) -> float:
         if done:
             return -100
 
@@ -157,18 +165,30 @@ class GameEnvironment:
 
         return checkpoint_reward + time_penalty
 
-    def _get_state(self, car):
-        lidar_readings, _ = self._get_lidar_readings(car)
-        return [car.velocity / car.max_velocity] + lidar_readings
+    def _get_state(self, racer: 'Racer') -> List[float]:
+        lidar_readings, _ = self._get_lidar_readings(racer.car)
 
-    def draw(self, screen, racers):
+        # Normalize velocity into forward and sideways components relative to car's orientation
+        velocity_vec = racer.car.position - racer.last_pos
+
+        angle_rad = math.radians(racer.car.angle)
+        forward_vec = pygame.math.Vector2(math.cos(angle_rad), -math.sin(angle_rad))
+
+        # Project velocity vector onto forward vector to get forward speed
+        forward_speed = velocity_vec.dot(forward_vec) / racer.car.max_velocity
+
+        # Use the cross product (in 2D, this is a scalar) to find sideways speed
+        sideways_speed = (forward_vec.x * velocity_vec.y - forward_vec.y * velocity_vec.x) / racer.car.max_velocity
+
+        return [forward_speed, sideways_speed] + lidar_readings
+
+    def draw(self, screen: pygame.Surface, racers: List['Racer']) -> None:
         self.track.draw(screen)
-        self.track.draw_checkpoints(screen)
         for racer in racers:
             racer.car.draw(screen)
             self._draw_lidar(screen, racer.car)
 
-    def _draw_lidar(self, screen, car):
+    def _draw_lidar(self, screen: pygame.Surface, car: 'Car') -> None:
         _, lidar_end_points = self._get_lidar_readings(car)
         for point in lidar_end_points:
             pygame.draw.line(screen, (0, 255, 0), car.position, point, 1)
