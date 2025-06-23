@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from game.track import Track
@@ -17,3 +17,4 @@ class Racer:
         self.done = False
         self.last_pos = self.car.position.copy()
         self.time_since_checkpoint = 0
+        self.current_state: List[float] = []

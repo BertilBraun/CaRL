@@ -1,7 +1,6 @@
 import random
 import pygame
 import os
-from typing import List, Tuple
 
 from game.environment import GameEnvironment
 from agent.racer import Racer
@@ -43,26 +42,28 @@ def main() -> None:
     # --- Main Loop ---
     for episode in range(EPISODES):
         racers = active_racers = [Racer(track, random.random() * 0.9) for _ in range(RACERS)]
+        for r in racers:
+            r.current_state = env._get_state(r)
 
         while active_racers:
             # --- Agent-Environment Interaction ---
             # 1. Get states from all active racers
-            states = [env._get_state(r) for r in active_racers]
+            states = [r.current_state for r in active_racers]
 
             # 2. Get actions from the agent (batched)
             actions = agent.select_actions(states)
 
             # 3. Apply actions and get results
-            for i, racer in enumerate(active_racers):
+            for racer, action in zip(active_racers, actions):
                 # The previous state is what we stored earlier
-                prev_state = states[i]
-                action = actions[i]
+                prev_state = racer.current_state
 
                 next_state, reward, done = env.step(racer, action)
                 agent.store_transition(prev_state, action, reward, next_state, done)
 
                 racer.done = racer.done or done
                 racer.total_reward += reward
+                racer.current_state = next_state
 
             # prepare active racers for next iteration
             active_racers = [r for r in active_racers if not r.done]
