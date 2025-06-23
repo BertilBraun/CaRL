@@ -12,9 +12,9 @@ from game.track import Track
 def main() -> None:
     # --- Config ---
     EPISODES = 100
-    RACERS = 100
+    RACERS = 20
     MAX_ITERATIONS = 500
-    EPISODES_TO_RENDER = 5
+    EPISODES_TO_RENDER = 2
     CHECKPOINT_DIR = 'checkpoints'
     CHECKPOINT_FILE = 'dqn_model.pth'
 
@@ -26,15 +26,8 @@ def main() -> None:
     pygame.display.set_caption('Car RL')
     clock = pygame.time.Clock()
 
-    track_nodes: List[Tuple[float, float]] = [
-        (500.0, 570.0),
-        (300.0, 570.0),
-        (200.0, 360.0),
-        (300.0, 150.0),
-        (980.0, 150.0),
-        (1080.0, 360.0),
-        (980.0, 570.0),
-    ]
+    from track import track_nodes
+
     track = Track(track_nodes)
     env = GameEnvironment(track, MAX_ITERATIONS)
 
@@ -68,7 +61,7 @@ def main() -> None:
                 next_state, reward, done = env.step(racer, action)
                 agent.store_transition(prev_state, action, reward, next_state, done)
 
-                racer.done = done
+                racer.done = racer.done or done
                 racer.total_reward += reward
 
             # prepare active racers for next iteration

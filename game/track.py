@@ -9,16 +9,23 @@ class Track:
         self.width = 60
         self.nodes = [pygame.math.Vector2(p) for p in nodes]
 
-        # add nodes in between, if the distance between two nodes is larger than 10
-        index = 0
-        while index < len(self.nodes):
-            p1 = self.nodes[index]
-            p2 = self.nodes[(index + 1) % len(self.nodes)]
-            if p1.distance_to(p2) > 50:
-                # add a node 10 units away from p1 in the direction of p2
-                new_node = p1 + (p2 - p1).normalize() * 50
-                self.nodes.insert(index + 1, new_node)
-            index += 1
+        # Continuously add nodes at the halfway point of long segments
+        # until all segments are shorter than 50 units.
+        while True:
+            nodes_added_in_pass = False
+            index = 0
+            while index < len(self.nodes) - 1:
+                p1 = self.nodes[index]
+                p2 = self.nodes[index + 1]
+                if p1.distance_to(p2) > 50:
+                    # Insert a new node at the midpoint of the segment
+                    mid_point = p1.lerp(p2, 0.5)
+                    self.nodes.insert(index + 1, mid_point)
+                    nodes_added_in_pass = True
+                index += 1
+
+            if not nodes_added_in_pass:
+                break
 
         self.outer_points: List[pygame.math.Vector2] = []
         self.inner_points: List[pygame.math.Vector2] = []
@@ -143,3 +150,7 @@ class Track:
         # Draw start and finish lines
         pygame.draw.line(screen, (0, 255, 0), self.checkpoints[0][0], self.checkpoints[0][1], 5)  # Green for start
         pygame.draw.line(screen, (255, 0, 0), self.checkpoints[-1][0], self.checkpoints[-1][1], 5)  # Red for finish
+
+        # Draw the checkpoints
+        for checkpoint in self.checkpoints:
+            pygame.draw.line(screen, (255, 255, 255), checkpoint[0], checkpoint[1], 5)
