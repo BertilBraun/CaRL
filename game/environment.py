@@ -16,17 +16,13 @@ if TYPE_CHECKING:
 class GameEnvironment:
     def __init__(self, track: Track) -> None:
         self.track = track
-        self.action_map: Dict[int, Tuple[int, int]] = {
-            0: (0, 0),  # coast
-            1: (1, 0),  # accelerate
-            2: (-1, 0),  # brake
-            3: (0, 1),  # steer left
-            4: (0, -1),  # steer right
-        }
 
-    def step(self, racer: 'Racer', action: int) -> Tuple[List[float], float, bool]:
+    def step(self, racer: 'Racer', action: np.ndarray) -> Tuple[List[float], float, bool]:
+        # Action is expected to be a np.ndarray with two values: [acceleration, steering]
+        # acceleration is in [-1, 1], steering is in [-1, 1]
+        acceleration_input, steering_input = action[0], action[1]
+
         # Update car physics
-        acceleration_input, steering_input = self.action_map[action]
         racer.car.update(acceleration_input, steering_input)
 
         # --- Reward Calculation ---

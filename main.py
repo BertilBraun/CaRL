@@ -1,18 +1,23 @@
 import pygame
+import os
 from typing import List, Tuple
 
 from game.environment import GameEnvironment
 from agent.racer import Racer
-from agent.dqn_agent import DQNAgent
+from agent.ddpg_agent import DDPGAgent
 from game.track import Track
 
 
 def main() -> None:
-    EPISODES = 2
-    RACERS = 5
-    MAX_ITERATIONS = 1000
+    # --- Config ---
+    EPISODES = 10
+    RACERS = 10  # TODO: DDPG is off-policy, better to train with one racer at a time??
+    MAX_ITERATIONS = 2000
     RENDER = True
+    CHECKPOINT_DIR = 'checkpoints'
+    CHECKPOINT_FILE = 'ddpg_model'
 
+    # --- Setup ---
     pygame.init()
     screen_width = 1280
     screen_height = 720
@@ -31,8 +36,20 @@ def main() -> None:
     track = Track(track_nodes)
     env = GameEnvironment(track)
 
-    agent = DQNAgent(state_dim=len(env._get_state(Racer(track))), action_dim=len(env.action_map))
+    # --- Agent Setup ---
+    state_dim = len(env._get_state(Racer(track)))
+    action_dim = 2  # [acceleration, steering]
+    max_action = 1.0  # Corresponds to car's max inputs
+    agent = DDPGAgent(state_dim, action_dim, max_action)
 
+    # Load existing model if found
+    try:
+        agent.load(CHECKPOINT_DIR, CHECKPOINT_FILE)
+        print('Loaded model checkpoint.')
+    except FileNotFoundError:
+        print('No checkpoint found, starting new training.')
+
+    # --- Main Loop ---
     for episode in range(EPISODES):
         racers = [Racer(track) for _ in range(RACERS)]
 
@@ -47,7 +64,7 @@ def main() -> None:
             states = [env._get_state(r) for r in racers]
 
             # 2. Get actions from the agent (batched)
-            actions = agent.select_action(states)
+            actions = agent.select_actions(states)
 
             # 3. Apply actions and get results
             for i, racer in enumerate(racers):
@@ -65,7 +82,7 @@ def main() -> None:
             racers = [r for r in racers if not r.done]
 
             # 4. Perform one step of learning
-            agent.experience_replay()
+            agent.learn()
 
             # --- Rendering ---
             if RENDER:
@@ -78,8 +95,9 @@ def main() -> None:
 
         print(f'Episode {episode} finished. All racers crashed or finished.')
         agent.decay_epsilon()  # Decay epsilon at the end of an episode
-        if episode > 0 and episode % agent.target_update == 0:
-            agent.update_target_net()
+        agent.update_target_net()
+
+        agent.save(CHECKPOINT_DIR, CHECKPOINT_FILE)
 
         # Log results for the episode
         avg_reward = sum([r.total_reward for r in racers]) / RACERS
