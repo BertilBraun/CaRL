@@ -51,8 +51,8 @@ class Track:
         # Start cap
         v_start = (self.nodes[1] - self.nodes[0]).normalize()
         n_start = pygame.math.Vector2(-v_start.y, v_start.x)
-        self.outer_points.append(self.nodes[0] + n_start * self.width / 2)
-        self.inner_points.append(self.nodes[0] - n_start * self.width / 2)
+        self.outer_points.append(self.nodes[0] - n_start * self.width / 2)
+        self.inner_points.append(self.nodes[0] + n_start * self.width / 2)
         self.checkpoints.append((self.inner_points[0], self.outer_points[0]))
 
         # Intermediate segments
@@ -89,8 +89,8 @@ class Track:
         # End cap
         v_end = (self.nodes[-1] - self.nodes[-2]).normalize()
         n_end = pygame.math.Vector2(-v_end.y, v_end.x)
-        self.outer_points.append(self.nodes[-1] + n_end * self.width / 2)
-        self.inner_points.append(self.nodes[-1] - n_end * self.width / 2)
+        self.outer_points.append(self.nodes[-1] - n_end * self.width / 2)
+        self.inner_points.append(self.nodes[-1] + n_end * self.width / 2)
         self.checkpoints.append((self.inner_points[-1], self.outer_points[-1]))
 
     def get_point_at_fraction(self, fraction: float) -> Tuple[pygame.math.Vector2, float, int]:
