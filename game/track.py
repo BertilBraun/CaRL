@@ -23,95 +23,123 @@ class Track:
         self.outer_points: List[pygame.math.Vector2] = []
         self.inner_points: List[pygame.math.Vector2] = []
         self.checkpoints: List[Tuple[pygame.math.Vector2, pygame.math.Vector2]] = []
+
+        self.segment_lengths: List[float] = []
+        self.cumulative_lengths: List[float] = [0.0]
+        self.total_length: float = 0.0
+
+        self._calculate_path_lengths()
         self._generate_track_boundaries()
 
+    def _calculate_path_lengths(self) -> None:
+        """Calculates the length of each segment and the total path length."""
+        for i in range(len(self.nodes) - 1):
+            p1 = self.nodes[i]
+            p2 = self.nodes[i + 1]
+            length = p1.distance_to(p2)
+            self.segment_lengths.append(length)
+
+        self.total_length = sum(self.segment_lengths)
+
+        # Calculate cumulative lengths for easy lookup
+        cumulative = 0.0
+        for length in self.segment_lengths:
+            cumulative += length
+            self.cumulative_lengths.append(cumulative)
+
     def _generate_track_boundaries(self) -> None:
-        # Convert node tuples to Vector2 for easier math
-        self.outer_points = []
-        self.inner_points = []
+        # Start cap
+        v_start = (self.nodes[1] - self.nodes[0]).normalize()
+        n_start = pygame.math.Vector2(-v_start.y, v_start.x)
+        self.outer_points.append(self.nodes[0] + n_start * self.width / 2)
+        self.inner_points.append(self.nodes[0] - n_start * self.width / 2)
+        self.checkpoints.append((self.inner_points[0], self.outer_points[0]))
 
-        for i in range(len(self.nodes)):
+        # Intermediate segments
+        for i in range(1, len(self.nodes) - 1):
             p_curr = self.nodes[i]
-            p_prev = self.nodes[i - 1]  # Wraps around for the last point
-            p_next = self.nodes[(i + 1) % len(self.nodes)]
+            p_prev = self.nodes[i - 1]
+            p_next = self.nodes[i + 1]
 
-            # Vector from previous to current, and from current to next
             v_in = (p_curr - p_prev).normalize()
             v_out = (p_next - p_curr).normalize()
-
-            # Correctly calculate outward-pointing normal for a CW track
             n_in = pygame.math.Vector2(v_in.y, -v_in.x)
             n_out = pygame.math.Vector2(v_out.y, -v_out.x)
 
-            # Mitre joint calculation
-            # For each corner, we define two infinite lines for the outer boundary
-            # and two for the inner boundary, then find their intersection.
-            outer1_p1 = p_prev + n_in * (self.width / 2)
-            outer1_p2 = p_curr + n_in * (self.width / 2)
+            outer1_p1 = p_prev + n_in * self.width / 2
+            outer1_p2 = p_curr + n_in * self.width / 2
+            outer2_p1 = p_curr + n_out * self.width / 2
+            outer2_p2 = p_next + n_out * self.width / 2
+            inner1_p1 = p_prev - n_in * self.width / 2
+            inner1_p2 = p_curr - n_in * self.width / 2
+            inner2_p1 = p_curr - n_out * self.width / 2
+            inner2_p2 = p_next - n_out * self.width / 2
 
-            outer2_p1 = p_curr + n_out * (self.width / 2)
-            outer2_p2 = p_next + n_out * (self.width / 2)
+            outer_corner = get_infinite_line_intersection(outer1_p1, outer1_p2, outer2_p1, outer2_p2) or (
+                p_curr + n_in * self.width / 2
+            )
+            inner_corner = get_infinite_line_intersection(inner1_p1, inner1_p2, inner2_p1, inner2_p2) or (
+                p_curr - n_in * self.width / 2
+            )
 
-            inner1_p1 = p_prev - n_in * (self.width / 2)
-            inner1_p2 = p_curr - n_in * (self.width / 2)
+            self.outer_points.append(outer_corner)
+            self.inner_points.append(inner_corner)
+            self.checkpoints.append((inner_corner, outer_corner))
 
-            inner2_p1 = p_curr - n_out * (self.width / 2)
-            inner2_p2 = p_next - n_out * (self.width / 2)
+        # End cap
+        v_end = (self.nodes[-1] - self.nodes[-2]).normalize()
+        n_end = pygame.math.Vector2(-v_end.y, v_end.x)
+        self.outer_points.append(self.nodes[-1] + n_end * self.width / 2)
+        self.inner_points.append(self.nodes[-1] - n_end * self.width / 2)
+        self.checkpoints.append((self.inner_points[-1], self.outer_points[-1]))
 
-            outer_corner = get_infinite_line_intersection(outer1_p1, outer1_p2, outer2_p1, outer2_p2)
-            if outer_corner:
-                self.outer_points.append(outer_corner)
-            else:
-                # Fallback for parallel lines (though unlikely with this logic)
-                self.outer_points.append(p_curr + n_in * self.width / 2)
+    def get_point_at_fraction(self, fraction: float) -> Tuple[pygame.math.Vector2, float, int]:
+        """
+        Gets a point on the track's centerline at a given fraction of its total length.
+        Also returns the index of the next checkpoint from that point.
+        """
+        if not (0.0 <= fraction <= 1.0):
+            raise ValueError('Fraction must be between 0.0 and 1.0')
 
-            inner_corner = get_infinite_line_intersection(inner1_p1, inner1_p2, inner2_p1, inner2_p2)
-            if inner_corner:
-                self.inner_points.append(inner_corner)
-            else:
-                # Fallback
-                self.inner_points.append(p_curr - n_in * self.width / 2)
+        target_dist = self.total_length * fraction
 
-        # Create checkpoints from the boundary points
-        self.checkpoints = []
-        for i in range(len(self.inner_points)):
-            p1 = self.inner_points[i]
-            p2 = self.outer_points[i]
-            self.checkpoints.append((p1, p2))
+        # Find which segment the target distance falls into
+        segment_index = -1
+        for i, cum_len in enumerate(self.cumulative_lengths):
+            if target_dist <= cum_len:
+                segment_index = i - 1
+                break
+
+        # This handles the case where fraction is 1.0
+        if segment_index == -1:
+            segment_index = len(self.nodes) - 2
+
+        start_node = self.nodes[segment_index]
+        end_node = self.nodes[segment_index + 1]
+
+        dist_into_segment = target_dist - self.cumulative_lengths[segment_index]
+        segment_vector = end_node - start_node
+
+        # Interpolate the position
+        point = start_node + segment_vector.normalize() * dist_into_segment
+
+        # The next checkpoint is the end of the current segment
+        next_checkpoint_index = segment_index + 1
+
+        angle = -math.degrees(math.atan2(segment_vector.y, segment_vector.x))
+
+        return point, angle, next_checkpoint_index
 
     def draw(self, screen: pygame.Surface) -> None:
-        track_color = (100, 100, 100)  # Gray
-        grass_color = (34, 139, 34)  # Forest green
-        line_color = (255, 255, 255)  # White
+        track_color = (100, 100, 100)
+        grass_color = (34, 139, 34)
 
-        # Fill background with grass color
         screen.fill(grass_color)
 
-        # Draw the track
-        pygame.draw.polygon(screen, track_color, self.outer_points)
-        pygame.draw.polygon(screen, grass_color, self.inner_points)
+        # Create a single polygon for the whole track for drawing
+        track_poly = self.outer_points + self.inner_points[::-1]
+        pygame.draw.polygon(screen, track_color, track_poly)
 
-        # Draw the start/finish line
-        start_pos_vec = pygame.math.Vector2(self.get_start_position())
-        direction = (self.nodes[0] - self.nodes[-1]).normalize()
-        perp_vec = pygame.math.Vector2(direction.y, -direction.x)  # Use the correct normal for CW
-        self.start_finish_line = (
-            start_pos_vec + perp_vec * (self.width / 2),
-            start_pos_vec - perp_vec * (self.width / 2),
-        )
-
-        pygame.draw.line(screen, line_color, self.start_finish_line[0], self.start_finish_line[1], 5)
-
-        # for each of the checkpoints, draw a point
-        for i, (p1, p2) in enumerate(self.checkpoints):
-            # Draw checkpoints in a different color for debugging
-            color = (0, 255, 255) if i % 2 == 0 else (255, 0, 255)
-            pygame.draw.line(screen, color, p1, p2, 2)
-
-    def get_start_position(self) -> pygame.math.Vector2:
-        # Start in the middle of the last centerline segment
-        return (self.nodes[0] + self.nodes[-1]) / 2
-
-    def get_start_angle(self) -> float:
-        d = self.nodes[0] - self.nodes[-1]
-        return -math.degrees(math.atan2(d.y, d.x))
+        # Draw start and finish lines
+        pygame.draw.line(screen, (0, 255, 0), self.checkpoints[0][0], self.checkpoints[0][1], 5)  # Green for start
+        pygame.draw.line(screen, (255, 0, 0), self.checkpoints[-1][0], self.checkpoints[-1][1], 5)  # Red for finish

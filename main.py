@@ -1,3 +1,4 @@
+import random
 import pygame
 import os
 from typing import List, Tuple
@@ -38,7 +39,7 @@ def main() -> None:
     env = GameEnvironment(track, MAX_ITERATIONS)
 
     # --- Agent Setup ---
-    state_dim = len(env._get_state(Racer(track)))
+    state_dim = len(env._get_state(Racer(track, 0.0)))
     action_dim = len(env.action_map)
     agent = DQNAgent(state_dim=state_dim, action_dim=action_dim)
 
@@ -48,7 +49,7 @@ def main() -> None:
 
     # --- Main Loop ---
     for episode in range(EPISODES):
-        racers = active_racers = [Racer(track) for _ in range(RACERS)]
+        racers = active_racers = [Racer(track, random.random() * 0.9) for _ in range(RACERS)]
 
         while active_racers:
             # --- Agent-Environment Interaction ---
@@ -94,10 +95,14 @@ def main() -> None:
         agent.save(CHECKPOINT_DIR, CHECKPOINT_FILE)
 
         # Log results for the episode
-        avg_reward = sum([r.total_reward for r in racers]) / RACERS
-        avg_laps = sum([r.lap_count for r in racers]) / RACERS
+        finished_racers = [r for r in racers if r.next_checkpoint >= len(track.checkpoints) - 1]
+        avg_reward = sum([r.total_reward for r in racers]) / RACERS if RACERS > 0 else 0
+
         print(
-            f'Episode {episode + 1}/{EPISODES} | Avg Reward: {avg_reward:.2f} | Avg Laps: {avg_laps:.2f} | Epsilon: {agent.epsilon:.2f}'
+            f'Episode {episode + 1}/{EPISODES} | '
+            f'Finished: {len(finished_racers)}/{RACERS} | '
+            f'Avg Reward: {avg_reward:.2f} | '
+            f'Epsilon: {agent.epsilon:.2f}'
         )
 
     pygame.quit()

@@ -68,35 +68,42 @@ class GameEnvironment:
         p1 = racer.last_pos
         p2 = racer.car.position
 
+        # Prevent checking for checkpoints that don't exist
+        if racer.next_checkpoint >= len(self.track.checkpoints):
+            return 0.0
+
         next_checkpoint_line = self.track.checkpoints[racer.next_checkpoint]
         p3 = next_checkpoint_line[0]
         p4 = next_checkpoint_line[1]
 
         if get_line_segment_intersection(p1, p2, p3, p4):
+            # If it's the final checkpoint, give a large reward
+            if racer.next_checkpoint == len(self.track.checkpoints) - 1:
+                racer.done = True  # Mark as finished
+                reward = 1000.0
+            else:
+                reward = 50.0
+
             racer.next_checkpoint += 1
             racer.time_since_checkpoint = 0
-            reward = 50
-
-            if racer.next_checkpoint >= len(self.track.checkpoints):
-                racer.next_checkpoint = 0
-                racer.lap_count += 1
-                reward = 1000
 
         return reward
 
     def _check_collision(self, racer: 'Racer') -> bool:
         """
-        Checks if the car is within the local track area, defined by two polygons
-        spanning from the previous-previous to the next checkpoint.
-        A point is valid if it's in *either* of these two polygons.
+        Checks if the car is within the local track area, defined by three polygons
+        spanning from the previous-previous to the next-next checkpoint.
+        A point is valid if it's in *any* of these three polygons.
         """
         car_points = self._get_car_corners(racer.car)
 
         num_checkpoints = len(self.track.checkpoints)
         next_cp = racer.next_checkpoint
-        prev_cp = (next_cp - 1 + num_checkpoints) % num_checkpoints
-        next_next_cp = (next_cp + 1 + num_checkpoints) % num_checkpoints
-        prev_prev_cp = (next_cp - 2 + num_checkpoints) % num_checkpoints
+
+        # Define indices for the 3-segment window, clamping at the track ends
+        prev_prev_cp = max(0, next_cp - 2)
+        prev_cp = max(0, next_cp - 1)
+        next_next_cp = min(num_checkpoints - 1, next_cp + 1)
 
         # Define the three local track segments
         p_prev_prev_inner, p_prev_prev_outer = self.track.checkpoints[prev_prev_cp]
@@ -110,7 +117,7 @@ class GameEnvironment:
         local_poly3 = [p_next_next_outer, p_next_outer, p_next_inner, p_next_next_inner]
 
         for point in car_points:
-            # A car point is valid if it's inside either of the two local polygons
+            # A car point is valid if it's inside any of the three local polygons
             in_poly1 = self._point_in_polygon(point, local_poly1)
             in_poly2 = self._point_in_polygon(point, local_poly2)
             in_poly3 = self._point_in_polygon(point, local_poly3)
