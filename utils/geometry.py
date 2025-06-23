@@ -1,6 +1,17 @@
 import numba
 import numpy as np
 from typing import Tuple
+import pygame
+
+
+def vector_to_numpy(v: pygame.math.Vector2) -> np.ndarray:
+    """Converts a pygame Vector2 to a numpy array."""
+    return np.array([v.x, v.y], dtype=np.float32)
+
+
+def numpy_to_vector(a: np.ndarray) -> pygame.math.Vector2:
+    """Converts a 2-element numpy array to a pygame Vector2."""
+    return pygame.math.Vector2(a[0], a[1])
 
 
 @numba.njit

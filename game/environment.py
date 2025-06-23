@@ -9,6 +9,8 @@ from utils.geometry import (
     get_line_segment_intersection_fast,
     get_lidar_readings_fast,
     point_in_polygon_fast,
+    vector_to_numpy,
+    numpy_to_vector,
 )
 
 # Guard imports for type-hinting to prevent circular dependencies
@@ -83,10 +85,10 @@ class GameEnvironment:
         p3 = next_checkpoint_line[0]
         p4 = next_checkpoint_line[1]
 
-        p1_np = np.array([p1.x, p1.y], dtype=np.float32)
-        p2_np = np.array([p2.x, p2.y], dtype=np.float32)
-        p3_np = np.array([p3.x, p3.y], dtype=np.float32)
-        p4_np = np.array([p4.x, p4.y], dtype=np.float32)
+        p1_np = vector_to_numpy(p1)
+        p2_np = vector_to_numpy(p2)
+        p3_np = vector_to_numpy(p3)
+        p4_np = vector_to_numpy(p4)
 
         if get_line_segment_intersection_fast(p1_np, p2_np, p3_np, p4_np) is not None:
             # If it's the final checkpoint, give a large reward
@@ -138,7 +140,7 @@ class GameEnvironment:
         return False
 
     def _get_car_corners_np(self, car: 'Car') -> np.ndarray:
-        center = np.array([car.position.x, car.position.y], dtype=np.float32)
+        center = vector_to_numpy(car.position)
         angle_rad = np.radians(car.angle)
 
         half_len = car.length / 2
@@ -162,9 +164,9 @@ class GameEnvironment:
         return rotated_corners + center
 
     def _get_lidar_readings(self, car: 'Car') -> Tuple[List[float], List[pygame.math.Vector2]]:
-        car_pos_np = np.array([car.position.x, car.position.y], dtype=np.float32)
+        car_pos_np = vector_to_numpy(car.position)
         readings, end_points = get_lidar_readings_fast(car.angle, car_pos_np, self.track_lines_np)
-        return readings.tolist(), [pygame.math.Vector2(x, y) for x, y in end_points]
+        return readings.tolist(), [numpy_to_vector(p) for p in end_points]
 
     def _get_track_lines(self) -> np.ndarray:
         lines = []

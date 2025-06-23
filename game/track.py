@@ -1,7 +1,7 @@
 import pygame
 import math
 import numpy as np
-from utils.geometry import get_line_segment_intersection_fast
+from utils.geometry import get_line_segment_intersection_fast, numpy_to_vector, vector_to_numpy
 from typing import List, Tuple
 
 
@@ -74,33 +74,24 @@ class Track:
             n_in = pygame.math.Vector2(v_in.y, -v_in.x)
             n_out = pygame.math.Vector2(v_out.y, -v_out.x)
 
-            outer1_p1 = p_prev + n_in * self.width / 2
-            outer1_p2 = p_curr + n_in * self.width / 2
-            outer2_p1 = p_curr + n_out * self.width / 2
-            outer2_p2 = p_next + n_out * self.width / 2
-            inner1_p1 = p_prev - n_in * self.width / 2
-            inner1_p2 = p_curr - n_in * self.width / 2
-            inner2_p1 = p_curr - n_out * self.width / 2
-            inner2_p2 = p_next - n_out * self.width / 2
+            outer1_p1 = vector_to_numpy(p_prev + n_in * self.width / 2)
+            outer1_p2 = vector_to_numpy(p_curr + n_in * self.width / 2)
+            outer2_p1 = vector_to_numpy(p_curr + n_out * self.width / 2)
+            outer2_p2 = vector_to_numpy(p_next + n_out * self.width / 2)
+            inner1_p1 = vector_to_numpy(p_prev - n_in * self.width / 2)
+            inner1_p2 = vector_to_numpy(p_curr - n_in * self.width / 2)
+            inner2_p1 = vector_to_numpy(p_curr - n_out * self.width / 2)
+            inner2_p2 = vector_to_numpy(p_next - n_out * self.width / 2)
 
-            outer1_p1_np = np.array([outer1_p1.x, outer1_p1.y], dtype=np.float32)
-            outer1_p2_np = np.array([outer1_p2.x, outer1_p2.y], dtype=np.float32)
-            outer2_p1_np = np.array([outer2_p1.x, outer2_p1.y], dtype=np.float32)
-            outer2_p2_np = np.array([outer2_p2.x, outer2_p2.y], dtype=np.float32)
-            inner1_p1_np = np.array([inner1_p1.x, inner1_p1.y], dtype=np.float32)
-            inner1_p2_np = np.array([inner1_p2.x, inner1_p2.y], dtype=np.float32)
-            inner2_p1_np = np.array([inner2_p1.x, inner2_p1.y], dtype=np.float32)
-            inner2_p2_np = np.array([inner2_p2.x, inner2_p2.y], dtype=np.float32)
-
-            outer_corner_np = get_line_segment_intersection_fast(outer1_p1_np, outer1_p2_np, outer2_p1_np, outer2_p2_np)
+            outer_corner_np = get_line_segment_intersection_fast(outer1_p1, outer1_p2, outer2_p1, outer2_p2)
             if outer_corner_np is not None:
-                outer_corner = pygame.math.Vector2(outer_corner_np[0], outer_corner_np[1])
+                outer_corner = numpy_to_vector(outer_corner_np)
             else:
                 outer_corner = p_curr + n_in * self.width / 2
 
-            inner_corner_np = get_line_segment_intersection_fast(inner1_p1_np, inner1_p2_np, inner2_p1_np, inner2_p2_np)
+            inner_corner_np = get_line_segment_intersection_fast(inner1_p1, inner1_p2, inner2_p1, inner2_p2)
             if inner_corner_np is not None:
-                inner_corner = pygame.math.Vector2(inner_corner_np[0], inner_corner_np[1])
+                inner_corner = numpy_to_vector(inner_corner_np)
             else:
                 inner_corner = p_curr - n_in * self.width / 2
 
