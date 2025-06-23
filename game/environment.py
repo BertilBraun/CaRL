@@ -48,23 +48,6 @@ class GameEnvironment:
 
         checkpoint_reward = self._check_checkpoint_crossing(racer)
 
-        # 2a. Check if the racer is stalled or moving backwards
-        current_progress = self.track.get_progress_on_track(racer.car.position)
-        racer.progress_history.append(current_progress)
-        if len(racer.progress_history) > self.STALLED_WINDOW:
-            racer.progress_history.pop(0)
-
-        if len(racer.progress_history) == self.STALLED_WINDOW:
-            progress_in_window = racer.progress_history[-1] - racer.progress_history[0]
-            if progress_in_window < self.MIN_PROGRESS_THRESHOLD:
-                racer.time_stalled += 1
-            else:
-                racer.time_stalled = 0
-
-        if racer.time_stalled > self.MAX_STALLED_TIME:
-            done = True
-            progress_reward = -200.0
-
         # 3. Calculate speed for reward and state
         velocity_vec = racer.car.position - racer.last_pos
         angle_rad = math.radians(racer.car.angle)
@@ -119,7 +102,7 @@ class GameEnvironment:
             return -100.0
 
         time_penalty = -0.1
-        speed_reward = forward_speed * 0.1
+        speed_reward = forward_speed * 0.05
         speed_penalty = -0.5 if forward_speed < 0.1 else 0
 
         return checkpoint_reward + progress_reward + time_penalty + speed_reward + speed_penalty

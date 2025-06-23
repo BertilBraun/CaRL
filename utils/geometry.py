@@ -38,6 +38,32 @@ def get_line_segment_intersection(
 
 
 @numba.njit
+def get_corners_numba(x: float, y: float, angle: float, length: float, width: float) -> np.ndarray:
+    center = np.array([x, y], dtype=np.float32)
+    angle_rad = np.radians(-angle)
+
+    half_len = length / 2
+    half_wid = width / 2
+
+    corners = np.array(
+        [
+            [-half_len, -half_wid],
+            [half_len, -half_wid],
+            [half_len, half_wid],
+            [-half_len, half_wid],
+        ],
+        dtype=np.float32,
+    )
+
+    rotation_matrix = np.array(
+        [[np.cos(angle_rad), -np.sin(angle_rad)], [np.sin(angle_rad), np.cos(angle_rad)]], dtype=np.float32
+    )
+
+    rotated_corners = corners @ rotation_matrix.T
+    return rotated_corners + center
+
+
+@numba.njit
 def get_line_segment_intersection_fast(p1: np.ndarray, p2: np.ndarray, p3s: np.ndarray, p4s: np.ndarray):
     """
     Calculates the intersection of a line segment with a batch of other line segments.

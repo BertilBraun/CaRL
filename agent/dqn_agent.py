@@ -35,16 +35,16 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=0.001)
-        self.memory: Deque[Tuple[List[float], int, float, List[float], bool]] = deque(maxlen=10000)
+        self.memory: Deque[Tuple[List[float], int, float, List[float], bool]] = deque(maxlen=30000)
 
         self.batch_size = 64
         self.gamma = 0.99
         self.epsilon_start = 0.2
-        self.epsilon_end = 0.01
-        self.epsilon_decay = 0.995
+        self.epsilon_end = 0.03
+        self.epsilon_decay = 0.99
         self.epsilon = self.epsilon_start
 
-        self.target_update = 1
+        self.target_update = 2
 
     def select_actions(self, states: List[List[float]]) -> List[int]:
         if random.random() < self.epsilon:

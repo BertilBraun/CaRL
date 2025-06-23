@@ -1,5 +1,6 @@
 import pygame
 import math
+import numba
 from utils.geometry import (
     get_line_segment_intersection,
     numpy_to_vector,
@@ -13,6 +14,56 @@ import numpy as np
 
 if TYPE_CHECKING:
     from game.car import Car
+
+
+@numba.njit
+def _check_collision_fast(car_points, checkpoints_np, num_checkpoints, next_checkpoint):
+    next_cp = next_checkpoint
+
+    # Define indices for the 3-segment window, clamping at the track ends
+    prev_prev_cp = max(0, next_cp - 2)
+    prev_cp = max(0, next_cp - 1)
+    next_next_cp = min(num_checkpoints - 1, next_cp + 1)
+
+    # Define the three local track segments using numpy
+    p_prev_prev_inner = checkpoints_np[prev_prev_cp, 0]
+    p_prev_prev_outer = checkpoints_np[prev_prev_cp, 1]
+    p_prev_inner = checkpoints_np[prev_cp, 0]
+    p_prev_outer = checkpoints_np[prev_cp, 1]
+    p_next_inner = checkpoints_np[next_cp, 0]
+    p_next_outer = checkpoints_np[next_cp, 1]
+    p_next_next_inner = checkpoints_np[next_next_cp, 0]
+    p_next_next_outer = checkpoints_np[next_next_cp, 1]
+
+    # Pre-allocate arrays for polygons to be Numba-friendly
+    local_poly1 = np.empty((4, 2), dtype=np.float32)
+    local_poly1[0, :] = p_prev_outer
+    local_poly1[1, :] = p_prev_prev_outer
+    local_poly1[2, :] = p_prev_prev_inner
+    local_poly1[3, :] = p_prev_inner
+
+    local_poly2 = np.empty((4, 2), dtype=np.float32)
+    local_poly2[0, :] = p_next_outer
+    local_poly2[1, :] = p_prev_outer
+    local_poly2[2, :] = p_prev_inner
+    local_poly2[3, :] = p_next_inner
+
+    local_poly3 = np.empty((4, 2), dtype=np.float32)
+    local_poly3[0, :] = p_next_next_outer
+    local_poly3[1, :] = p_next_outer
+    local_poly3[2, :] = p_next_inner
+    local_poly3[3, :] = p_next_next_inner
+
+    for i in range(len(car_points)):
+        point = car_points[i]
+        in_poly1 = point_in_polygon_fast(point, local_poly1)
+        in_poly2 = point_in_polygon_fast(point, local_poly2)
+        in_poly3 = point_in_polygon_fast(point, local_poly3)
+
+        if not in_poly1 and not in_poly2 and not in_poly3:
+            return True
+
+    return False
 
 
 class Track:
@@ -48,6 +99,10 @@ class Track:
 
         self._calculate_path_lengths()
         self._generate_track_boundaries()
+
+        self.checkpoints_np = np.array(
+            [[(cp[0].x, cp[0].y), (cp[1].x, cp[1].y)] for cp in self.checkpoints], dtype=np.float32
+        )
 
         # Cache numpy versions of track boundaries for Numba
         self.outer_points_np = np.array([(p.x, p.y) for p in self.outer_points], dtype=np.float32)
@@ -139,39 +194,7 @@ class Track:
 
     def check_collision(self, car: 'Car', next_checkpoint: int) -> bool:
         car_points = car.get_corners_np()
-
-        num_checkpoints = len(self.checkpoints)
-        next_cp = next_checkpoint
-
-        # Define indices for the 3-segment window, clamping at the track ends
-        prev_prev_cp = max(0, next_cp - 2)
-        prev_cp = max(0, next_cp - 1)
-        next_next_cp = min(num_checkpoints - 1, next_cp + 1)
-
-        # Define the three local track segments using numpy
-        p_prev_prev_inner = np.array(self.checkpoints[prev_prev_cp][0], dtype=np.float32)
-        p_prev_prev_outer = np.array(self.checkpoints[prev_prev_cp][1], dtype=np.float32)
-        p_prev_inner = np.array(self.checkpoints[prev_cp][0], dtype=np.float32)
-        p_prev_outer = np.array(self.checkpoints[prev_cp][1], dtype=np.float32)
-        p_next_inner = np.array(self.checkpoints[next_cp][0], dtype=np.float32)
-        p_next_outer = np.array(self.checkpoints[next_cp][1], dtype=np.float32)
-        p_next_next_inner = np.array(self.checkpoints[next_next_cp][0], dtype=np.float32)
-        p_next_next_outer = np.array(self.checkpoints[next_next_cp][1], dtype=np.float32)
-
-        # Polygons are defined in a consistent order (e.g., CCW)
-        local_poly1 = np.array([p_prev_outer, p_prev_prev_outer, p_prev_prev_inner, p_prev_inner])
-        local_poly2 = np.array([p_next_outer, p_prev_outer, p_prev_inner, p_next_inner])
-        local_poly3 = np.array([p_next_next_outer, p_next_outer, p_next_inner, p_next_next_inner])
-
-        for point in car_points:
-            in_poly1 = point_in_polygon_fast(point, local_poly1)
-            in_poly2 = point_in_polygon_fast(point, local_poly2)
-            in_poly3 = point_in_polygon_fast(point, local_poly3)
-
-            if not in_poly1 and not in_poly2 and not in_poly3:
-                return True
-
-        return False
+        return _check_collision_fast(car_points, self.checkpoints_np, len(self.checkpoints), next_checkpoint)
 
     def get_point_at_fraction(self, fraction: float) -> Tuple[pygame.math.Vector2, float, int]:
         """

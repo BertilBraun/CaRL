@@ -10,10 +10,10 @@ from game.track import Track
 
 def main() -> None:
     # --- Config ---
-    EPISODES = 100
-    RACERS = 20
+    EPISODES = 1000
+    RACERS = 200
     MAX_ITERATIONS = 500
-    EPISODES_TO_RENDER = 2
+    EPISODES_TO_RENDER = 10
     CHECKPOINT_DIR = 'checkpoints'
     CHECKPOINT_FILE = 'dqn_model.pth'
 

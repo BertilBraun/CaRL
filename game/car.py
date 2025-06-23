@@ -2,7 +2,7 @@ from typing import Tuple
 import pygame
 import math
 import numpy as np
-from utils.geometry import numpy_to_vector, vector_to_numpy
+from utils.geometry import get_corners_numba
 
 
 class Car:
@@ -52,28 +52,7 @@ class Car:
         self.position.y -= self.velocity * math.sin(math.radians(self.angle))
 
     def get_corners_np(self) -> np.ndarray:
-        center = vector_to_numpy(self.position)
-        angle_rad = np.radians(-self.angle)
-
-        half_len = self.length / 2
-        half_wid = self.width / 2
-
-        corners = np.array(
-            [
-                [-half_len, -half_wid],
-                [half_len, -half_wid],
-                [half_len, half_wid],
-                [-half_len, half_wid],
-            ],
-            dtype=np.float32,
-        )
-
-        rotation_matrix = np.array(
-            [[np.cos(angle_rad), -np.sin(angle_rad)], [np.sin(angle_rad), np.cos(angle_rad)]], dtype=np.float32
-        )
-
-        rotated_corners = corners @ rotation_matrix.T
-        return rotated_corners + center
+        return get_corners_numba(self.position.x, self.position.y, self.angle, self.length, self.width)
 
     def draw(self, screen: pygame.Surface, color: Tuple[int, int, int] = (255, 0, 0)) -> None:
         car_surface = pygame.Surface((self.length, self.width), pygame.SRCALPHA)
