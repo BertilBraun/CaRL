@@ -12,23 +12,23 @@ class Car:
         self.length = 40
         self.width = 20
         self.max_velocity = 5
-        self.acceleration_rate = 0.1
-        self.braking_rate = 0.2
+        self.acceleration_rate = 0.2
+        self.braking_rate = 0.1
         self.friction = 0.05
         self.max_steering_angle = 3
 
-    def update(self, acceleration_input: int = 0, steering_input: int = 0) -> None:
+    def update(self, acceleration_input: float = 0.0, steering_input: float = 0.0) -> None:
         """
         Update car state based on inputs.
-        :param acceleration_input: 1 for accelerate, -1 for brake, 0 for coast.
-        :param steering_input: positive for left, negative for right.
+        :param acceleration_input: float between -1 (brake) and 1 (accelerate)
+        :param steering_input: float between -1 (right) and 1 (left)
         """
 
         # Apply acceleration and braking
-        if acceleration_input == 1:
-            self.velocity += self.acceleration_rate
-        elif acceleration_input == -1:
-            self.velocity -= self.braking_rate
+        if acceleration_input > 0:
+            self.velocity += self.acceleration_rate * acceleration_input
+        elif acceleration_input < 0:
+            self.velocity += self.braking_rate * acceleration_input  # Note: acceleration_input is negative
 
         # Apply friction
         if self.velocity > 0:
@@ -47,8 +47,6 @@ class Car:
         # Update position vector
         self.position.x += self.velocity * math.cos(math.radians(self.angle))
         self.position.y -= self.velocity * math.sin(math.radians(self.angle))
-
-        print(self.position, self.angle, self.velocity, acceleration_input, steering_input)
 
     def draw(self, screen: pygame.Surface) -> None:
         car_surface = pygame.Surface((self.length, self.width), pygame.SRCALPHA)

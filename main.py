@@ -4,18 +4,18 @@ from typing import List, Tuple
 
 from game.environment import GameEnvironment
 from agent.racer import Racer
-from agent.ddpg_agent import DDPGAgent
+from agent.dqn_agent import DQNAgent
 from game.track import Track
 
 
 def main() -> None:
     # --- Config ---
-    EPISODES = 10
-    RACERS = 10  # TODO: DDPG is off-policy, better to train with one racer at a time??
-    MAX_ITERATIONS = 2000
-    RENDER = True
+    EPISODES = 1000
+    RACERS = 20
+    MAX_ITERATIONS = 500
+    EPISODES_TO_RENDER = 5
     CHECKPOINT_DIR = 'checkpoints'
-    CHECKPOINT_FILE = 'ddpg_model'
+    CHECKPOINT_FILE = 'dqn_model.pth'
 
     # --- Setup ---
     pygame.init()
@@ -26,6 +26,7 @@ def main() -> None:
     clock = pygame.time.Clock()
 
     track_nodes: List[Tuple[float, float]] = [
+        (500.0, 570.0),
         (300.0, 570.0),
         (200.0, 360.0),
         (300.0, 150.0),
@@ -34,68 +35,61 @@ def main() -> None:
         (980.0, 570.0),
     ]
     track = Track(track_nodes)
-    env = GameEnvironment(track)
+    env = GameEnvironment(track, MAX_ITERATIONS)
 
     # --- Agent Setup ---
     state_dim = len(env._get_state(Racer(track)))
-    action_dim = 2  # [acceleration, steering]
-    max_action = 1.0  # Corresponds to car's max inputs
-    agent = DDPGAgent(state_dim, action_dim, max_action)
+    action_dim = len(env.action_map)
+    agent = DQNAgent(state_dim=state_dim, action_dim=action_dim)
 
     # Load existing model if found
-    try:
+    if os.path.exists(os.path.join(CHECKPOINT_DIR, CHECKPOINT_FILE)):
         agent.load(CHECKPOINT_DIR, CHECKPOINT_FILE)
-        print('Loaded model checkpoint.')
-    except FileNotFoundError:
-        print('No checkpoint found, starting new training.')
 
     # --- Main Loop ---
     for episode in range(EPISODES):
-        racers = [Racer(track) for _ in range(RACERS)]
+        racers = active_racers = [Racer(track) for _ in range(RACERS)]
 
-        for _ in range(MAX_ITERATIONS):
-            if RENDER:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        exit()
-
+        while active_racers:
             # --- Agent-Environment Interaction ---
             # 1. Get states from all active racers
-            states = [env._get_state(r) for r in racers]
+            states = [env._get_state(r) for r in active_racers]
 
             # 2. Get actions from the agent (batched)
             actions = agent.select_actions(states)
 
             # 3. Apply actions and get results
-            for i, racer in enumerate(racers):
+            for i, racer in enumerate(active_racers):
                 # The previous state is what we stored earlier
                 prev_state = states[i]
                 action = actions[i]
 
-                # The environment steps forward
                 next_state, reward, done = env.step(racer, action)
-
-                # Store the transition in the agent's memory
                 agent.store_transition(prev_state, action, reward, next_state, done)
-                racer.done = done
 
-            racers = [r for r in racers if not r.done]
+                racer.done = done
+                racer.total_reward += reward
+
+            # prepare active racers for next iteration
+            active_racers = [r for r in active_racers if not r.done]
 
             # 4. Perform one step of learning
-            agent.learn()
+            agent.experience_replay()
 
             # --- Rendering ---
-            if RENDER:
-                env.draw(screen, racers)
+            if EPISODES_TO_RENDER > 0 and episode % EPISODES_TO_RENDER == 0:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        exit()
+
+                env.draw(screen, active_racers)
                 pygame.display.flip()
                 clock.tick(60)
 
-            if not racers:
-                break
-
-        print(f'Episode {episode} finished. All racers crashed or finished.')
-        agent.decay_epsilon()  # Decay epsilon at the end of an episode
-        agent.update_target_net()
+        # --- End of Episode ---
+        agent.decay_epsilon()
+        if episode > 0 and episode % agent.target_update == 0:
+            agent.update_target_net()
 
         agent.save(CHECKPOINT_DIR, CHECKPOINT_FILE)
 

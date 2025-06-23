@@ -9,6 +9,17 @@ class Track:
         self.width = 60
         self.nodes = [pygame.math.Vector2(p) for p in nodes]
 
+        # add nodes in between, if the distance between two nodes is larger than 10
+        index = 0
+        while index < len(self.nodes):
+            p1 = self.nodes[index]
+            p2 = self.nodes[(index + 1) % len(self.nodes)]
+            if p1.distance_to(p2) > 30:
+                # add a node 10 units away from p1 in the direction of p2
+                new_node = p1 + (p2 - p1).normalize() * 30
+                self.nodes.insert(index + 1, new_node)
+            index += 1
+
         self.outer_points: List[pygame.math.Vector2] = []
         self.inner_points: List[pygame.math.Vector2] = []
         self.checkpoints: List[Tuple[pygame.math.Vector2, pygame.math.Vector2]] = []

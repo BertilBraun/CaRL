@@ -1,6 +1,7 @@
 import pygame
 import math
 import numpy as np
+from numba import njit
 from .track import Track
 from utils.geometry import get_line_segment_intersection
 from typing import List, Tuple, Dict
@@ -13,16 +14,51 @@ if TYPE_CHECKING:
     from game.car import Car
 
 
+@njit
+def is_point_in_polygon_numba(point: np.ndarray, polygon_nodes: np.ndarray) -> bool:
+    """
+    Numba-optimized point-in-polygon test.
+    """
+    x, y = point[0], point[1]
+    n = len(polygon_nodes)
+    inside = False
+    p1x, p1y = polygon_nodes[0, 0], polygon_nodes[0, 1]
+    for i in range(n + 1):
+        p2x, p2y = polygon_nodes[i % n, 0], polygon_nodes[i % n, 1]
+        if y > min(p1y, p2y):
+            if y <= max(p1y, p2y):
+                if x <= max(p1x, p2x):
+                    xinters = 0.0
+                    if p1y != p2y:
+                        xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+
+                    if p1x == p2x or x <= xinters:
+                        inside = not inside
+        p1x, p1y = p2x, p2y
+    return inside
+
+
 class GameEnvironment:
-    def __init__(self, track: Track) -> None:
+    def __init__(self, track: Track, timeout_to_reach_next_checkpoint: int) -> None:
         self.track = track
+        self.timeout_to_reach_next_checkpoint = timeout_to_reach_next_checkpoint
+        self.action_map: Dict[int, Tuple[float, float]] = {
+            0: (0.0, 0.0),  # coast
+            1: (1.0, 0.0),  # accelerate
+            2: (-1.0, 0.0),  # brake
+            3: (0.0, 1.0),  # steer left
+            4: (0.0, -1.0),  # steer right
+            5: (1.0, 1.0),  # accelerate and steer left
+            6: (1.0, -1.0),  # accelerate and steer right
+        }
 
-    def step(self, racer: 'Racer', action: np.ndarray) -> Tuple[List[float], float, bool]:
-        # Action is expected to be a np.ndarray with two values: [acceleration, steering]
-        # acceleration is in [-1, 1], steering is in [-1, 1]
-        acceleration_input, steering_input = action[0], action[1]
+        # Cache numpy versions of track boundaries for Numba
+        self.outer_points_np = np.array([(p.x, p.y) for p in self.track.outer_points], dtype=np.float32)
+        self.inner_points_np = np.array([(p.x, p.y) for p in self.track.inner_points], dtype=np.float32)
 
+    def step(self, racer: 'Racer', action: int) -> Tuple[List[float], float, bool]:
         # Update car physics
+        acceleration_input, steering_input = self.action_map[action]
         racer.car.update(acceleration_input, steering_input)
 
         # --- Reward Calculation ---
@@ -47,7 +83,7 @@ class GameEnvironment:
         racer.last_pos = racer.car.position.copy()
         racer.time_since_checkpoint += 1
 
-        if racer.time_since_checkpoint > 300:
+        if racer.time_since_checkpoint > self.timeout_to_reach_next_checkpoint:
             done = True
 
         return state, reward, done
@@ -74,32 +110,13 @@ class GameEnvironment:
         return reward
 
     def _check_collision(self, car: 'Car') -> bool:
-        car_corners = self._get_car_corners(car)
-        for point in car_corners:
-            if not self._point_in_polygon(point, self.track.outer_points) or self._point_in_polygon(
-                point, self.track.inner_points
+        for point in self._get_car_corners(car):
+            point_np = np.array([point.x, point.y], dtype=np.float32)
+            if not is_point_in_polygon_numba(point_np, self.outer_points_np) or is_point_in_polygon_numba(
+                point_np, self.inner_points_np
             ):
                 return True
         return False
-
-    def _point_in_polygon(self, point: pygame.math.Vector2, polygon: List[pygame.math.Vector2]) -> bool:
-        x, y = point.x, point.y
-        n = len(polygon)
-        inside = False
-        p1x, p1y = polygon[0].x, polygon[0].y
-        for i in range(n + 1):
-            p2x, p2y = polygon[i % n].x, polygon[i % n].y
-            if y > min(p1y, p2y):
-                if y <= max(p1y, p2y):
-                    if x <= max(p1x, p2x):
-                        xinters = 0.0
-                        if p1y != p2y:
-                            xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
-
-                        if p1x == p2x or x <= xinters:
-                            inside = not inside
-            p1x, p1y = p2x, p2y
-        return inside
 
     def _get_car_corners(self, car: 'Car') -> List[pygame.math.Vector2]:
         center = car.position
