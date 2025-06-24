@@ -3,7 +3,7 @@
 This project showcases a 2D reinforcement learning simulation where a car, powered by a Deep Q-Network (DQN) agent, learns to navigate complex racetracks. The agent is trained using a parallelized simulation approach, where hundreds of racers learn simultaneously, sharing their experiences to accelerate learning.
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.9-blue.svg">
+  <img src="https://img.shields.io/badge/Python-3.10-blue.svg">
   <img src="https://img.shields.io/badge/Pygame-2.1-orange.svg">
   <img src="https://img.shields.io/badge/PyTorch-1.13-red.svg">
 </p>
@@ -12,16 +12,17 @@ This project showcases a 2D reinforcement learning simulation where a car, power
 
 The videos below demonstrate the agent's performance. The training video shows multiple agents learning simultaneously, starting from random points on the track to improve generalization. The evaluation video shows a single, trained agent driving a full lap.
 
-<p align="center">
-  <strong>Training</strong>
-  <br>
-  <video src="documentation/train_100_200_500.mp4" style="width: 80%;"></video>
-</p>
-<p align="center">
-  <strong>Evaluation</strong>
-  <br>
-  <video src="documentation/evaluation_10_50_200_500.mp4" style="width: 80%;"></video>
-</p>
+### Training
+
+![Training](documentation/train_100_200_500.gif)
+
+The training video shows 100 parallel racers learning simultaneously, starting from random points on the track and added noise to the actions to improve generalization. The training episodes are 100, 200, and 500.
+
+### Evaluation
+
+![Evaluation](documentation/evaluation_10_50_200_500.gif)
+
+The evaluation video shows 100 racers driving with slight offsets in the initial angle to show variation in the agent's performance. The evaluation episodes are 10, 50, 200, and 500.
 
 ## Core Features
 
