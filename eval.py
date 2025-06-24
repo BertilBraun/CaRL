@@ -3,6 +3,7 @@ import pygame
 import os
 import numpy as np
 from typing import Dict
+import imageio
 
 from game.environment import GameEnvironment
 from agent.racer import Racer
@@ -12,16 +13,16 @@ from game.track import Track
 # --- Config ---
 RACERS = 100
 MAX_ITERATIONS = 1000  # Increased to allow more time for completion
-INITIAL_ANGLE_VARIANCE = 3
-EPSILON_FOR_EVALUATION = 0.01
+INITIAL_ANGLE_VARIANCE = 5
+EPSILON_FOR_EVALUATION = 0.001
 
 
-def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface) -> None:
+def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface, output_gif_file: str) -> None:
     original_epsilon = agent.epsilon
     agent.epsilon = EPSILON_FOR_EVALUATION  # Disable randomness almost completely for evaluation
 
     # Start all racers at the beginning of the track
-    racers = active_racers = [Racer(env.track, progress_on_track=0.01) for _ in range(RACERS)]
+    racers = active_racers = [Racer(env.track, progress_on_track=0.02) for _ in range(RACERS)]
 
     # randomly adjust the initial angle by a tiny amount
     for r in racers:
@@ -31,6 +32,7 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
     for r in racers:
         r.current_state = env._get_state(r)
 
+    frames = []
     while active_racers:
         # --- Agent-Environment Interaction ---
         # 1. Get states from all active racers
@@ -56,10 +58,16 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
                 pygame.quit()
                 return
 
-        env.draw(screen, racers[::10])  # Render a subset of racers
+        env.draw(screen, racers)
         pygame.display.flip()
+        frame = pygame.surfarray.array3d(screen).transpose((1, 0, 2))
+        frames.append(frame)
 
     # --- End of Episode ---
+    print('Saving evaluation GIF...')
+    imageio.mimsave(output_gif_file, frames, fps=300)
+    print(f'GIF saved as {output_gif_file}')
+
     finished_racers = [r for r in racers if r.next_checkpoint >= len(env.track.checkpoints) - 1]
     completion_rate = len(finished_racers) / RACERS if RACERS > 0 else 0
     avg_reward = sum(r.total_reward for r in racers) / RACERS if RACERS > 0 else 0
@@ -85,10 +93,9 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
 
 
 if __name__ == '__main__':
+    CHECKPOINT_DIR = 'checkpoints'
 
-    def main() -> None:
-        CHECKPOINT_DIR = 'checkpoints'
-        CHECKPOINT_FILE = 'dqn_model.pth'
+    def main(checkpoint_file: str) -> None:
         # --- Setup ---
         pygame.init()
         screen_width = 1280
@@ -107,16 +114,18 @@ if __name__ == '__main__':
         agent = DQNAgent(state_dim=state_dim, action_dim=action_dim)
 
         # Load existing model
-        model_path = os.path.join(CHECKPOINT_DIR, CHECKPOINT_FILE)
+        model_path = os.path.join(CHECKPOINT_DIR, checkpoint_file)
         if not os.path.exists(model_path):
             print(f'Model not found at {model_path}. Exiting.')
             return
 
-        agent.load(CHECKPOINT_DIR, CHECKPOINT_FILE)
+        agent.load(CHECKPOINT_DIR, checkpoint_file)
 
         print('\n--- Starting Evaluation ---')
-        evaluate_model(agent, env, screen)
+        output_gif_file = f'evaluation_{checkpoint_file}.gif'
+        evaluate_model(agent, env, screen, output_gif_file)
 
         pygame.quit()
 
-    main()
+    for checkpoint_file in os.listdir(CHECKPOINT_DIR):
+        main(checkpoint_file)
