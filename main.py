@@ -27,7 +27,7 @@ def setup_environment(track_nodes: List[Tuple[float, float]]) -> GameEnvironment
 
 
 def setup_agent(env: GameEnvironment) -> DQNAgent:
-    state_dim = len(env._get_state(Racer(env.track, 0.0)))
+    state_dim = len(env.get_state(Racer(env.track, 0.0)))
     action_dim = len(env.ACTION_MAP)
     agent = DQNAgent(state_dim=state_dim, action_dim=action_dim)
     return agent
@@ -67,7 +67,7 @@ def main() -> None:
             r.car.angle += random.uniform(-INITIAL_ANGLE_VARIANCE, INITIAL_ANGLE_VARIANCE)
 
         for r in racers:
-            r.current_state = env._get_state(r)
+            r.current_state = env.get_state(r)
 
         while active_racers:
             # --- Agent-Environment Interaction ---

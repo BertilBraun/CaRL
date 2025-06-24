@@ -23,7 +23,7 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
     agent.epsilon = EPSILON_FOR_EVALUATION  # Disable randomness almost completely for evaluation
 
     # Start all racers at the beginning of the track
-    racers = active_racers = [Racer(env.track, progress_on_track=0.02) for _ in range(RACERS)]
+    racers = active_racers = [Racer(env.track, progress_on_track=random.random() * 0.95 + 0.02) for _ in range(RACERS)]
 
     # randomly adjust the initial angle by a tiny amount
     for r in racers:
@@ -31,7 +31,7 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
 
     racer_iterations: Dict[Racer, int] = {r: 0 for r in racers}
     for r in racers:
-        r.current_state = env._get_state(r)
+        r.current_state = env.get_state(r)
 
     frames = []
     while active_racers:
@@ -97,6 +97,7 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
 
 if __name__ == '__main__':
     CHECKPOINT_DIR = 'checkpoints'
+    CHECKPOINT_FILE = 'dqn_model.pth'
 
     def main(checkpoint_file: str) -> None:
         from track import track_nodes
@@ -121,5 +122,4 @@ if __name__ == '__main__':
 
         pygame.quit()
 
-    for checkpoint_file in os.listdir(CHECKPOINT_DIR):
-        main(checkpoint_file)
+    main('dqn_model_200.pth')
