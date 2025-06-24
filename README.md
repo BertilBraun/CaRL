@@ -34,6 +34,8 @@ The evaluation video shows 100 racers driving with slight offsets in the initial
 
 ## The Environment
 
+Documentation can be found here: [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/BertilBraun/CaRL)
+
 ### State Representation
 The agent perceives its environment through a state vector containing:
 1.  **LIDAR Readings**: A set of distance measurements to the track boundaries, simulating LIDAR sensors.
