@@ -106,7 +106,7 @@ class GameEnvironment:
         speed_reward = forward_speed * 0.003
         speed_penalty = -0.5 if forward_speed < 0.1 else 0
         # penalize collision only if it's not a final checkpoint
-        collision_penalty = -200.0 if collision else 0
+        collision_penalty = -500.0 if collision else 0
 
         return collision_penalty + checkpoint_reward + progress_reward + time_penalty + speed_reward + speed_penalty
 

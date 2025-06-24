@@ -6,6 +6,7 @@ from game.environment import GameEnvironment
 from agent.racer import Racer
 from agent.dqn_agent import DQNAgent
 from game.track import Track
+from eval import evaluate_model
 
 
 def main() -> None:
@@ -14,6 +15,7 @@ def main() -> None:
     RACERS = 500
     MAX_ITERATIONS = 500
     EPISODES_TO_RENDER = 1
+    EPISODES_TO_EVALUATE = 10
     CHECKPOINT_DIR = 'checkpoints'
     CHECKPOINT_FILE = 'dqn_model.pth'
 
@@ -85,6 +87,9 @@ def main() -> None:
             agent.update_target_net()
 
         agent.save(CHECKPOINT_DIR, CHECKPOINT_FILE)
+
+        if EPISODES_TO_EVALUATE > 0 and episode % EPISODES_TO_EVALUATE == 0:
+            evaluate_model(agent, env, screen)
 
         # Log results for the episode
         finished_racers = [r for r in racers if r.next_checkpoint >= len(track.checkpoints) - 1]
