@@ -17,50 +17,33 @@ if TYPE_CHECKING:
 
 
 @numba.njit
-def _check_collision_fast(car_points, checkpoints_np, num_checkpoints, next_checkpoint):
-    next_cp = next_checkpoint
-
-    # Define indices for the 3-segment window, clamping at the track ends
-    prev_prev_cp = max(0, next_cp - 2)
-    prev_cp = max(0, next_cp - 1)
-    next_next_cp = min(num_checkpoints - 1, next_cp + 1)
-
-    # Define the three local track segments using numpy
-    p_prev_prev_inner = checkpoints_np[prev_prev_cp, 0]
-    p_prev_prev_outer = checkpoints_np[prev_prev_cp, 1]
-    p_prev_inner = checkpoints_np[prev_cp, 0]
-    p_prev_outer = checkpoints_np[prev_cp, 1]
-    p_next_inner = checkpoints_np[next_cp, 0]
-    p_next_outer = checkpoints_np[next_cp, 1]
-    p_next_next_inner = checkpoints_np[next_next_cp, 0]
-    p_next_next_outer = checkpoints_np[next_next_cp, 1]
-
-    # Pre-allocate arrays for polygons to be Numba-friendly
-    local_poly1 = np.empty((4, 2), dtype=np.float32)
-    local_poly1[0, :] = p_prev_outer
-    local_poly1[1, :] = p_prev_prev_outer
-    local_poly1[2, :] = p_prev_prev_inner
-    local_poly1[3, :] = p_prev_inner
-
-    local_poly2 = np.empty((4, 2), dtype=np.float32)
-    local_poly2[0, :] = p_next_outer
-    local_poly2[1, :] = p_prev_outer
-    local_poly2[2, :] = p_prev_inner
-    local_poly2[3, :] = p_next_inner
-
-    local_poly3 = np.empty((4, 2), dtype=np.float32)
-    local_poly3[0, :] = p_next_next_outer
-    local_poly3[1, :] = p_next_outer
-    local_poly3[2, :] = p_next_inner
-    local_poly3[3, :] = p_next_next_inner
+def _check_collision_fast(
+    car_points: np.ndarray, checkpoints_np: np.ndarray, num_checkpoints: int, next_checkpoint: int
+) -> bool:
+    window_size = 4
+    start_idx = max(0, next_checkpoint - window_size)
+    end_idx = min(num_checkpoints - 1, next_checkpoint + window_size)
 
     for i in range(len(car_points)):
         point = car_points[i]
-        in_poly1 = point_in_polygon_fast(point, local_poly1)
-        in_poly2 = point_in_polygon_fast(point, local_poly2)
-        in_poly3 = point_in_polygon_fast(point, local_poly3)
+        is_in_any_poly = False
+        for j in range(start_idx, end_idx):
+            p_curr_inner = checkpoints_np[j, 0]
+            p_curr_outer = checkpoints_np[j, 1]
+            p_next_inner = checkpoints_np[j + 1, 0]
+            p_next_outer = checkpoints_np[j + 1, 1]
 
-        if not in_poly1 and not in_poly2 and not in_poly3:
+            local_poly = np.empty((4, 2), dtype=np.float32)
+            local_poly[0, :] = p_next_outer
+            local_poly[1, :] = p_curr_outer
+            local_poly[2, :] = p_curr_inner
+            local_poly[3, :] = p_next_inner
+
+            if point_in_polygon_fast(point, local_poly):
+                is_in_any_poly = True
+                break
+
+        if not is_in_any_poly:
             return True
 
     return False
@@ -279,3 +262,11 @@ class Track:
         # Draw the checkpoints
         for checkpoint in self.checkpoints:
             pygame.draw.line(screen, (255, 255, 255), checkpoint[0], checkpoint[1], 5)
+
+        # for debugging
+        # draw all track boundaries
+        # for i in range(len(self.outer_points) - 1):
+        #     pygame.draw.line(screen, (255, 0, 0), self.outer_points[i], self.outer_points[i + 1], 5)
+        #
+        # for i in range(len(self.inner_points) - 1):
+        #     pygame.draw.line(screen, (255, 0, 0), self.inner_points[i], self.inner_points[i + 1], 5)

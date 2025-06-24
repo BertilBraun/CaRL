@@ -27,6 +27,8 @@ class GameEnvironment:
             4: (0.0, -1.0),  # steer right
             5: (1.0, 1.0),  # accelerate and steer left
             6: (1.0, -1.0),  # accelerate and steer right
+            7: (-1.0, 1.0),  # brake + left
+            8: (-1.0, -1.0),  # brake + right
         }
 
     def step(self, racer: 'Racer', action: int) -> Tuple[List[float], float, bool]:
@@ -43,7 +45,7 @@ class GameEnvironment:
         progress_reward = dist_before - dist_now
 
         # 2. Check for events and sparse rewards
-        done = self.track.check_collision(racer.car, racer.next_checkpoint)
+        collision = self.track.check_collision(racer.car, racer.next_checkpoint)
 
         checkpoint_reward = self._check_checkpoint_crossing(racer)
 
@@ -54,7 +56,7 @@ class GameEnvironment:
         forward_speed = velocity_vec.dot(forward_vec)
 
         # 4. Combine rewards into a final reward value
-        reward = self._calculate_reward(done, checkpoint_reward, progress_reward, forward_speed)
+        reward = self._calculate_reward(collision, checkpoint_reward, progress_reward, forward_speed)
 
         # --- State and Updates ---
         state = self._get_state(racer)
@@ -66,6 +68,8 @@ class GameEnvironment:
         if racer.last_pos_in_timeout.distance_to(racer.car.position) > self.MIN_PROGRESS_THRESHOLD:
             racer.time_since_last_pos_change = 0
             racer.last_pos_in_timeout = racer.car.position.copy()
+
+        done = collision
 
         if racer.time_since_last_pos_change > self.MAX_STALLED_TIME:
             done = True
@@ -105,16 +109,15 @@ class GameEnvironment:
         return reward
 
     def _calculate_reward(
-        self, done: bool, checkpoint_reward: float, progress_reward: float, forward_speed: float
+        self, collision: bool, checkpoint_reward: float, progress_reward: float, forward_speed: float
     ) -> float:
-        if done:
-            return -100.0
-
         time_penalty = -0.1
-        speed_reward = forward_speed * 0.01
+        speed_reward = forward_speed * 0.003
         speed_penalty = -0.5 if forward_speed < 0.1 else 0
+        # penalize collision only if it's not a final checkpoint
+        collision_penalty = -100.0 if collision and checkpoint_reward < 100.0 else 0
 
-        return checkpoint_reward + progress_reward + time_penalty + speed_reward + speed_penalty
+        return collision_penalty + checkpoint_reward + progress_reward + time_penalty + speed_reward + speed_penalty
 
     def _get_state(self, racer: 'Racer') -> List[float]:
         lidar_readings, _ = self.track.get_lidar_readings(racer.car)

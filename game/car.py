@@ -16,7 +16,7 @@ class Car:
         self.width = 20
         self.max_velocity = 10
         self.acceleration_rate = 0.3
-        self.braking_rate = 0.2
+        self.braking_rate = 0.5
         self.friction = 0.05
         self.max_steering_angle = 5
 

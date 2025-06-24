@@ -59,11 +59,11 @@ def main() -> None:
                 prev_state = racer.current_state
 
                 next_state, reward, done = env.step(racer, action)
-                agent.store_transition(prev_state, action, reward, next_state, done)
-
                 racer.done = racer.done or done
                 racer.total_reward += reward
                 racer.current_state = next_state
+
+                agent.store_transition(prev_state, action, reward, next_state, racer.done)
 
             # prepare active racers for next iteration
             active_racers = [r for r in active_racers if not r.done]

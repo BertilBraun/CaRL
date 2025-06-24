@@ -1,9 +1,9 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import random
 import numpy as np
-import os
 from collections import deque
 from typing import List, Tuple, Deque
 
@@ -35,16 +35,26 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=0.001)
-        self.memory: Deque[Tuple[List[float], int, float, List[float], bool]] = deque(maxlen=30000)
+        self.memory: Deque[Tuple[List[float], int, float, List[float], bool]] = deque(maxlen=20000)
 
-        self.batch_size = 64
-        self.gamma = 0.99
-        self.epsilon_start = 0.1
+        self.batch_size = 128
+
+        self.gamma = 0.995
+        # | γ value         | Horizon you’re telling the agent to look at                                     |
+        # | --------------- | ------------------------------------------------------------------------------- |
+        # | **0.90**        | ≈ 10 steps (reward 10 steps out is worth (0.9)¹⁰ ≈ 0.35 of an immediate reward) |
+        # | **0.99**        | ≈ 100 steps horizon                                                             |
+        # | **0.995–0.999** | Several hundred to a few thousand steps                                         |
+
+        self.epsilon_start = 0.2
         self.epsilon_end = 0.03
         self.epsilon_decay = 0.999
         self.epsilon = self.epsilon_start
+        # Epsilon is the probability of taking a random action which is used to explore the environment
+        # The epsilon is decayed over time to epsilon_end to gradually reduce the exploration
 
-        self.target_update = 2
+        self.target_update = 10
+        # The target network is updated every target_update steps, to make the policy network more stable
 
     def select_actions(self, states: List[List[float]]) -> List[int]:
         if random.random() < self.epsilon:
