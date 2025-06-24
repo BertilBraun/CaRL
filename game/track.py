@@ -1,52 +1,17 @@
+from __future__ import annotations
+
 import pygame
 import math
-import numba
 from utils.geometry import (
+    get_fast_collision_checker,
+    get_fast_lidar_reader,
     get_line_segment_intersection,
-    numpy_to_vector,
-    vector_to_numpy,
-    get_lidar_readings_fast,
-    point_in_polygon_fast,
     find_closest_point_on_segment,
 )
 from typing import List, Tuple, TYPE_CHECKING
-import numpy as np
 
 if TYPE_CHECKING:
     from game.car import Car
-
-
-@numba.njit
-def _check_collision_fast(
-    car_points: np.ndarray, checkpoints_np: np.ndarray, num_checkpoints: int, next_checkpoint: int
-) -> bool:
-    window_size = 5
-    start_idx = max(0, next_checkpoint - window_size)
-    end_idx = min(num_checkpoints - 1, next_checkpoint + window_size)
-
-    for i in range(len(car_points)):
-        point = car_points[i]
-        is_in_any_poly = False
-        for j in range(start_idx, end_idx):
-            p_curr_inner = checkpoints_np[j, 0]
-            p_curr_outer = checkpoints_np[j, 1]
-            p_next_inner = checkpoints_np[j + 1, 0]
-            p_next_outer = checkpoints_np[j + 1, 1]
-
-            local_poly = np.empty((4, 2), dtype=np.float32)
-            local_poly[0, :] = p_next_outer
-            local_poly[1, :] = p_curr_outer
-            local_poly[2, :] = p_curr_inner
-            local_poly[3, :] = p_next_inner
-
-            if point_in_polygon_fast(point, local_poly):
-                is_in_any_poly = True
-                break
-
-        if not is_in_any_poly:
-            return True
-
-    return False
 
 
 class Track:
@@ -83,14 +48,15 @@ class Track:
         self._calculate_path_lengths()
         self._generate_track_boundaries()
 
-        self.checkpoints_np = np.array(
-            [[(cp[0].x, cp[0].y), (cp[1].x, cp[1].y)] for cp in self.checkpoints], dtype=np.float32
-        )
+        self.collision_checker = get_fast_collision_checker(self.checkpoints)
 
-        # Cache numpy versions of track boundaries for Numba
-        self.outer_points_np = np.array([(p.x, p.y) for p in self.outer_points], dtype=np.float32)
-        self.inner_points_np = np.array([(p.x, p.y) for p in self.inner_points], dtype=np.float32)
-        self.track_lines_np = self._get_track_lines()
+        self.lidar_reader = get_fast_lidar_reader(
+            self.outer_points,
+            self.inner_points,
+            num_rays=5,
+            ray_length=300.0,
+            vicinity=10,
+        )
 
     def _calculate_path_lengths(self) -> None:
         """Calculates the length of each segment and the total path length."""
@@ -107,21 +73,6 @@ class Track:
         for length in self.segment_lengths:
             cumulative += length
             self.cumulative_lengths.append(cumulative)
-
-    def _get_track_lines(self) -> np.ndarray:
-        lines = []
-        # Outer boundary lines
-        for i in range(len(self.outer_points_np) - 1):
-            p1 = self.outer_points_np[i]
-            p2 = self.outer_points_np[i + 1]
-            lines.append([p1, p2])
-        # Inner boundary lines
-        for i in range(len(self.inner_points_np) - 1):
-            p1 = self.inner_points_np[i]
-            p2 = self.inner_points_np[i + 1]
-            lines.append([p1, p2])
-
-        return np.array(lines, dtype=np.float32)
 
     def _generate_track_boundaries(self) -> None:
         # Start cap
@@ -170,14 +121,11 @@ class Track:
         self.inner_points.append(self.nodes[-1] + n_end * self.width / 2)
         self.checkpoints.append((self.inner_points[-1], self.outer_points[-1]))
 
-    def get_lidar_readings(self, car: 'Car') -> Tuple[List[float], List[pygame.math.Vector2]]:
-        car_pos_np = vector_to_numpy(car.position)
-        readings, end_points = get_lidar_readings_fast(car.angle, car_pos_np, self.track_lines_np)
-        return readings.tolist(), [numpy_to_vector(p) for p in end_points]
+    def get_lidar_readings(self, car: Car, next_checkpoint: int) -> Tuple[List[float], List[pygame.math.Vector2]]:
+        return self.lidar_reader(car.angle, car.position, next_checkpoint)
 
-    def check_collision(self, car: 'Car', next_checkpoint: int) -> bool:
-        car_points = car.get_corners_np()
-        return _check_collision_fast(car_points, self.checkpoints_np, len(self.checkpoints), next_checkpoint)
+    def check_collision(self, car: Car, next_checkpoint: int) -> bool:
+        return self.collision_checker(car.get_corners_np(), next_checkpoint)
 
     def get_point_at_fraction(self, fraction: float) -> Tuple[pygame.math.Vector2, float, int]:
         """
@@ -265,5 +213,7 @@ class Track:
 
         # for debugging
         # draw all track boundaries
-        for tr in self.track_lines_np:
-            pygame.draw.line(screen, (255, 0, 0), numpy_to_vector(tr[0]), numpy_to_vector(tr[1]), 5)
+        for i in range(len(self.outer_points) - 1):
+            pygame.draw.line(screen, (255, 0, 0), self.outer_points[i], self.outer_points[i + 1], 5)
+        for i in range(len(self.inner_points) - 1):
+            pygame.draw.line(screen, (255, 0, 0), self.inner_points[i], self.inner_points[i + 1], 5)

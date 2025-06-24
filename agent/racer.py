@@ -20,7 +20,3 @@ class Racer:
 
         # Checkpoint detection
         self.time_since_checkpoint = 0
-
-        # Stalled detection
-        self.last_pos_in_timeout = self.car.position.copy()
-        self.time_since_last_pos_change = 0

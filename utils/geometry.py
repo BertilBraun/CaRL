@@ -1,7 +1,7 @@
 import numba
 import pygame
 import numpy as np
-from typing import Tuple
+from typing import Callable, List, Tuple
 
 
 def vector_to_numpy(v: pygame.math.Vector2) -> np.ndarray:
@@ -37,7 +37,7 @@ def get_line_segment_intersection(
     return None
 
 
-@numba.njit
+@numba.njit(fastmath=True, cache=True)
 def get_corners_numba(x: float, y: float, angle: float, length: float, width: float) -> np.ndarray:
     center = np.array([x, y], dtype=np.float32)
     angle_rad = np.radians(-angle)
@@ -63,7 +63,7 @@ def get_corners_numba(x: float, y: float, angle: float, length: float, width: fl
     return rotated_corners + center
 
 
-@numba.njit
+@numba.njit(fastmath=True, cache=True)
 def get_line_segment_intersection_fast(p1: np.ndarray, p2: np.ndarray, p3s: np.ndarray, p4s: np.ndarray):
     """
     Calculates the intersection of a line segment with a batch of other line segments.
@@ -93,46 +93,142 @@ def get_line_segment_intersection_fast(p1: np.ndarray, p2: np.ndarray, p3s: np.n
     return closest_intersection, distance
 
 
-@numba.njit
-def get_lidar_readings_fast(
-    car_angle: float,
-    car_position: np.ndarray,
-    track_lines: np.ndarray,
+def get_fast_collision_checker(
+    checkpoints: List[Tuple[pygame.math.Vector2, pygame.math.Vector2]],
+) -> Callable[[np.ndarray, int], bool]:
+    """Creates a fast collision checker function that can be used to check if a car is colliding with the track boundaries.
+    The checker takes the car's points and the current checkpoint, and returns a boolean indicating if the car is colliding.
+    """
+
+    checkpoints_np = np.array([[(cp[0].x, cp[0].y), (cp[1].x, cp[1].y)] for cp in checkpoints], dtype=np.float32)
+    num_checkpoints = len(checkpoints)
+
+    @numba.njit(fastmath=True, cache=True)
+    def check_collision_fast(car_points: np.ndarray, next_checkpoint: int) -> bool:
+        window_size = 5
+        start_idx = max(0, next_checkpoint - window_size)
+        end_idx = min(num_checkpoints - 1, next_checkpoint + window_size)
+
+        for i in range(len(car_points)):
+            point = car_points[i]
+            is_in_any_poly = False
+            for j in range(start_idx, end_idx):
+                p_curr_inner = checkpoints_np[j, 0]
+                p_curr_outer = checkpoints_np[j, 1]
+                p_next_inner = checkpoints_np[j + 1, 0]
+                p_next_outer = checkpoints_np[j + 1, 1]
+
+                local_poly = np.empty((4, 2), dtype=np.float32)
+                local_poly[0, :] = p_next_outer
+                local_poly[1, :] = p_curr_outer
+                local_poly[2, :] = p_curr_inner
+                local_poly[3, :] = p_next_inner
+
+                if point_in_polygon_fast(point, local_poly):
+                    is_in_any_poly = True
+                    break
+
+            if not is_in_any_poly:
+                return True
+
+        return False
+
+    return check_collision_fast
+
+
+def get_fast_lidar_reader(
+    outer_points: List[pygame.math.Vector2],
+    inner_points: List[pygame.math.Vector2],
     num_rays: int = 5,
     ray_length: float = 300.0,
-) -> Tuple[np.ndarray, np.ndarray]:
+    vicinity: int = 10,
+) -> Callable[[float, pygame.math.Vector2, int], Tuple[List[float], List[pygame.math.Vector2]]]:
+    """Creates a fast lidar reader function that can be used to get lidar readings for a car against track boundaries.
+    The reader takes the car's angle, position, and current checkpoint, and returns a list of lidar distances and end points.
     """
-    Calculates lidar readings for a car against track boundaries using Numba.
-    This version is vectorized to check all track lines at once for each ray.
-    """
-    angles = np.linspace(-90, 90, num_rays)
-    readings = np.full(num_rays, ray_length, dtype=np.float32)
-    lidar_end_points = np.zeros((num_rays, 2), dtype=np.float32)
 
-    start_pos = car_position
-    p3s = track_lines[:, 0, :]
-    p4s = track_lines[:, 1, :]
+    def _get_track_lines() -> np.ndarray:
+        outer_points_np = np.array([(p.x, p.y) for p in outer_points], dtype=np.float32)
+        inner_points_np = np.array([(p.x, p.y) for p in inner_points], dtype=np.float32)
 
-    ray_angles_rad = np.radians(car_angle + angles)
-    cos_rays = np.cos(ray_angles_rad)
-    sin_rays = np.sin(ray_angles_rad)
+        lines = []
+        # Outer boundary lines
+        for i in range(len(outer_points_np) - 1):
+            p1 = outer_points_np[i]
+            p2 = outer_points_np[i + 1]
+            lines.append([p1, p2])
+        # Inner boundary lines
+        for i in range(len(inner_points_np) - 1):
+            p1 = inner_points_np[i]
+            p2 = inner_points_np[i + 1]
+            lines.append([p1, p2])
 
-    for i in range(num_rays):
-        end_pos_long = start_pos + np.array([cos_rays[i] * ray_length, -sin_rays[i] * ray_length])
+        return np.array(lines, dtype=np.float32)
 
-        intersection, distance = get_line_segment_intersection_fast(start_pos, end_pos_long, p3s, p4s)
+    # Cache numpy versions of track boundaries for Numba
+    track_lines = _get_track_lines()
 
-        if intersection is not None:
-            readings[i] = distance
-            lidar_end_points[i, :] = intersection
-        else:
-            readings[i] = ray_length
-            lidar_end_points[i, :] = end_pos_long
+    @numba.njit(fastmath=True, cache=True)
+    def get_lidar_readings_fast(
+        car_angle: float,
+        car_position: np.ndarray,
+        current_checkpoint: int,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Calculates lidar readings for a car against track boundaries using Numba.
+        This version is vectorized to check all track lines at once for each ray.
+        It only considers track lines in the vicinity of the car's current checkpoint.
+        """
+        angles = np.linspace(-90, 90, num_rays)
+        readings = np.full(num_rays, ray_length, dtype=np.float32)
+        lidar_end_points = np.zeros((num_rays, 2), dtype=np.float32)
 
-    return readings / ray_length, lidar_end_points
+        start_pos = car_position
+
+        num_track_lines_total = track_lines.shape[0]
+        num_segments_per_side = num_track_lines_total // 2
+
+        start_idx = max(0, current_checkpoint - vicinity)
+        end_idx = min(num_segments_per_side, current_checkpoint + vicinity)
+
+        outer_indices = np.arange(start_idx, end_idx)
+        inner_indices = np.arange(num_segments_per_side + start_idx, num_segments_per_side + end_idx)
+
+        indices = np.concatenate((outer_indices, inner_indices))
+
+        relevant_track_lines = track_lines[indices]
+        p3s = relevant_track_lines[:, 0, :]
+        p4s = relevant_track_lines[:, 1, :]
+
+        ray_angles_rad = np.radians(car_angle + angles)
+        cos_rays = np.cos(ray_angles_rad)
+        sin_rays = np.sin(ray_angles_rad)
+
+        for i in range(num_rays):
+            end_pos_long = start_pos + np.array([cos_rays[i] * ray_length, -sin_rays[i] * ray_length])
+
+            intersection, distance = get_line_segment_intersection_fast(start_pos, end_pos_long, p3s, p4s)
+
+            if intersection is not None:
+                readings[i] = distance
+                lidar_end_points[i, :] = intersection
+            else:
+                readings[i] = ray_length
+                lidar_end_points[i, :] = end_pos_long
+
+        return readings / ray_length, lidar_end_points
+
+    def lidar_reader(
+        car_angle: float, car_position: pygame.math.Vector2, current_checkpoint: int
+    ) -> Tuple[List[float], List[pygame.math.Vector2]]:
+        car_pos_np = vector_to_numpy(car_position)
+        readings, end_points = get_lidar_readings_fast(car_angle, car_pos_np, current_checkpoint)
+        return readings.tolist(), [numpy_to_vector(p) for p in end_points]
+
+    return lidar_reader
 
 
-@numba.njit
+@numba.njit(fastmath=True, cache=True)
 def point_in_polygon_fast(point: np.ndarray, polygon: np.ndarray) -> bool:
     """
     Checks if a point is inside a polygon using the ray-casting algorithm with Numba.

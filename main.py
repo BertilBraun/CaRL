@@ -23,7 +23,6 @@ def main() -> None:
     screen_height = 720
     screen = pygame.display.set_mode((screen_width, screen_height))
     pygame.display.set_caption('Car RL')
-    clock = pygame.time.Clock()
 
     from track import track_nodes
 
@@ -41,7 +40,7 @@ def main() -> None:
 
     # --- Main Loop ---
     for episode in range(EPISODES):
-        racers = active_racers = [Racer(track, random.random() * 0.9) for _ in range(RACERS)]
+        racers = active_racers = [Racer(track, progress_on_track=random.random() * 0.8 + 0.05) for _ in range(RACERS)]
         for r in racers:
             r.current_state = env._get_state(r)
 
@@ -79,7 +78,6 @@ def main() -> None:
 
                 env.draw(screen, racers[::10])
                 pygame.display.flip()
-                clock.tick(60)
 
         # --- End of Episode ---
         agent.decay_epsilon()

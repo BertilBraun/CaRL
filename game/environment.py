@@ -63,17 +63,8 @@ class GameEnvironment:
 
         # Update racer state for the next step
         racer.last_pos = racer.car.position.copy()
-        racer.time_since_last_pos_change += 1
-
-        if racer.last_pos_in_timeout.distance_to(racer.car.position) > self.MIN_PROGRESS_THRESHOLD:
-            racer.time_since_last_pos_change = 0
-            racer.last_pos_in_timeout = racer.car.position.copy()
 
         done = collision
-
-        if racer.time_since_last_pos_change > self.MAX_STALLED_TIME:
-            done = True
-            reward = -200.0
 
         racer.time_since_checkpoint += 1
 
@@ -97,7 +88,7 @@ class GameEnvironment:
 
         if get_line_segment_intersection(p1, p2, p3, p4) is not None:
             # If it's the final checkpoint, give a large reward
-            if racer.next_checkpoint == len(self.track.checkpoints) - 1:
+            if racer.next_checkpoint == len(self.track.checkpoints) - 2:
                 racer.done = True  # Mark as finished
                 reward = 1000.0
             else:
@@ -120,7 +111,7 @@ class GameEnvironment:
         return collision_penalty + checkpoint_reward + progress_reward + time_penalty + speed_reward + speed_penalty
 
     def _get_state(self, racer: 'Racer') -> List[float]:
-        lidar_readings, _ = self.track.get_lidar_readings(racer.car)
+        lidar_readings, _ = self.track.get_lidar_readings(racer.car, racer.next_checkpoint)
 
         velocity_vec = racer.car.position - racer.last_pos
         angle_rad = math.radians(racer.car.angle)
@@ -142,6 +133,6 @@ class GameEnvironment:
             racer.car.draw(screen, (255, 0, 0) if racer.done else (0, 255, 0))
 
             # Draw lidar readings
-            _, lidar_end_points = self.track.get_lidar_readings(racer.car)
+            _, lidar_end_points = self.track.get_lidar_readings(racer.car, racer.next_checkpoint)
             for point in lidar_end_points:
                 pygame.draw.line(screen, (0, 255, 0), racer.car.position, point, 1)
