@@ -14,11 +14,11 @@ class Car:
         # Default car properties
         self.length = 40
         self.width = 20
-        self.max_velocity = 8
-        self.acceleration_rate = 0.2
-        self.braking_rate = 0.5
+        self.max_velocity = 15
+        self.acceleration_rate = 0.5
+        self.braking_rate = 1.2
         self.friction = 0.05
-        self.max_steering_angle = 5
+        self.max_steering_angle = 10
 
     def update(self, acceleration_input: float = 0.0, steering_input: float = 0.0) -> None:
         """
@@ -34,10 +34,7 @@ class Car:
             self.velocity += self.braking_rate * acceleration_input  # Note: acceleration_input is negative
 
         # Apply friction
-        if self.velocity > 0:
-            self.velocity -= self.friction
-        elif self.velocity < 0:  # for when braking makes it negative
-            self.velocity = 0
+        self.velocity -= self.friction
 
         # Clamp velocity
         self.velocity = max(0, min(self.velocity, self.max_velocity))
@@ -66,7 +63,7 @@ class Car:
         screen.blit(rotated_car, rect)
 
         # for debugging
-        from utils.geometry import numpy_to_vector
-
-        for p in self.get_corners_np():
-            pygame.draw.circle(screen, (0, 0, 0), numpy_to_vector(p), 5)
+        # from utils.geometry import numpy_to_vector
+        #
+        # for p in self.get_corners_np():
+        #     pygame.draw.circle(screen, (0, 0, 0), numpy_to_vector(p), 5)

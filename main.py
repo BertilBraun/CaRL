@@ -13,11 +13,12 @@ def main() -> None:
     # --- Config ---
     EPISODES = 1000
     RACERS = 500
-    MAX_ITERATIONS = 500
     EPISODES_TO_RENDER = 1
-    EPISODES_TO_EVALUATE = 10
+    EPISODES_TO_EVALUATE = [1, 5, 10, 20, 50, 100, 200, 500, 1000]
+    INITIAL_ANGLE_VARIANCE = 3
     CHECKPOINT_DIR = 'checkpoints'
     CHECKPOINT_FILE = 'dqn_model.pth'
+    EVAL_CHECKPOINT_FILE_FORMAT = 'dqn_model_{}.pth'
 
     # --- Setup ---
     pygame.init()
@@ -29,7 +30,7 @@ def main() -> None:
     from track import track_nodes
 
     track = Track(track_nodes)
-    env = GameEnvironment(track, MAX_ITERATIONS)
+    env = GameEnvironment(track, timeout_to_reach_next_checkpoint=100)
 
     # --- Agent Setup ---
     state_dim = len(env._get_state(Racer(track, 0.0)))
@@ -42,7 +43,12 @@ def main() -> None:
 
     # --- Main Loop ---
     for episode in range(EPISODES):
-        racers = active_racers = [Racer(track, progress_on_track=random.random() * 0.8 + 0.01) for _ in range(RACERS)]
+        racers = active_racers = [Racer(track, progress_on_track=random.random() * 0.95 + 0.02) for _ in range(RACERS)]
+
+        # randomly adjust the initial angle by a tiny amount
+        for r in racers:
+            r.car.angle += random.uniform(-INITIAL_ANGLE_VARIANCE, INITIAL_ANGLE_VARIANCE)
+
         for r in racers:
             r.current_state = env._get_state(r)
 
@@ -64,7 +70,8 @@ def main() -> None:
                 racer.total_reward += reward
                 racer.current_state = next_state
 
-                agent.store_transition(prev_state, action, reward, next_state, racer.done)
+                if racer.car.velocity > 1.0 or racer.done:
+                    agent.store_transition(prev_state, action, reward, next_state, racer.done)
 
             # prepare active racers for next iteration
             active_racers = [r for r in active_racers if not r.done]
@@ -78,7 +85,7 @@ def main() -> None:
                     if event.type == pygame.QUIT:
                         exit()
 
-                env.draw(screen, racers[::10])
+                env.draw(screen, racers[::20])
                 pygame.display.flip()
 
         # --- End of Episode ---
@@ -88,8 +95,10 @@ def main() -> None:
 
         agent.save(CHECKPOINT_DIR, CHECKPOINT_FILE)
 
-        if EPISODES_TO_EVALUATE > 0 and episode % EPISODES_TO_EVALUATE == 0:
-            evaluate_model(agent, env, screen)
+        if episode in EPISODES_TO_EVALUATE:
+            eval_checkpoint_file = EVAL_CHECKPOINT_FILE_FORMAT.format(episode)
+            agent.save(CHECKPOINT_DIR, eval_checkpoint_file)
+            evaluate_model(agent, env, screen, f'evaluation_{episode}.gif')
 
         # Log results for the episode
         finished_racers = [r for r in racers if r.next_checkpoint >= len(track.checkpoints) - 1]

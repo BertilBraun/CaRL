@@ -105,10 +105,11 @@ def get_fast_collision_checker(
 
     @numba.njit(fastmath=True, cache=True)
     def check_collision_fast(car_points: np.ndarray, next_checkpoint: int) -> bool:
-        window_size = 6
+        window_size = 10
         start_idx = max(0, next_checkpoint - window_size)
         end_idx = min(num_checkpoints - 1, next_checkpoint + window_size)
 
+        points_outside_track = 0
         for i in range(len(car_points)):
             point = car_points[i]
             is_in_any_poly = False
@@ -129,9 +130,9 @@ def get_fast_collision_checker(
                     break
 
             if not is_in_any_poly:
-                return True
+                points_outside_track += 1
 
-        return False
+        return points_outside_track > 1  # Hack, only count as collision if more than one point is outside the track
 
     return check_collision_fast
 
@@ -141,7 +142,7 @@ def get_fast_lidar_reader(
     inner_points: List[pygame.math.Vector2],
     num_rays: int = 5,
     ray_length: float = 300.0,
-    vicinity: int = 10,
+    vicinity: int = 20,
 ) -> Callable[[float, pygame.math.Vector2, int], Tuple[List[float], List[pygame.math.Vector2]]]:
     """Creates a fast lidar reader function that can be used to get lidar readings for a car against track boundaries.
     The reader takes the car's angle, position, and current checkpoint, and returns a list of lidar distances and end points.

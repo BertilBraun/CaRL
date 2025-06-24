@@ -20,3 +20,5 @@ class Racer:
 
         # Checkpoint detection
         self.time_since_checkpoint = 0
+        # Slow movement detection
+        self.time_since_last_movement = 0

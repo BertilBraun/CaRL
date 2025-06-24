@@ -6,6 +6,7 @@ import random
 import numpy as np
 from collections import deque
 from typing import List, Tuple, Deque
+import torch.nn.functional as F
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -35,35 +36,45 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=0.001)
-        self.memory: Deque[Tuple[List[float], int, float, List[float], bool]] = deque(maxlen=20000)
+        self.memory: Deque[Tuple[List[float], int, float, List[float], bool]] = deque(maxlen=50_000)
 
-        self.batch_size = 128
+        self.batch_size = 256
 
-        self.gamma = 0.995
-        # | γ value         | Horizon you’re telling the agent to look at                                     |
+        self.gamma = 0.999
+        # | γ value         | Horizon you're telling the agent to look at                                     |
         # | --------------- | ------------------------------------------------------------------------------- |
         # | **0.90**        | ≈ 10 steps (reward 10 steps out is worth (0.9)¹⁰ ≈ 0.35 of an immediate reward) |
         # | **0.99**        | ≈ 100 steps horizon                                                             |
         # | **0.995–0.999** | Several hundred to a few thousand steps                                         |
 
-        self.epsilon_start = 0.4
-        self.epsilon_end = 0.02
-        self.epsilon_decay = 0.99
+        self.epsilon_start = 1.0
+        self.epsilon_end = 0.01
+        self.epsilon_decay = 0.995
         self.epsilon = self.epsilon_start
         # Epsilon is the probability of taking a random action which is used to explore the environment
         # The epsilon is decayed over time to epsilon_end to gradually reduce the exploration
 
-        self.target_update = 5
+        self.target_update = 10
         # The target network is updated every target_update steps, to make the policy network more stable
 
     def select_actions(self, states: List[List[float]]) -> List[int]:
-        if random.random() < self.epsilon:
-            return [random.randrange(self.action_dim) for _ in range(len(states))]
-        else:
-            with torch.no_grad():
-                state_tensor = torch.FloatTensor(np.array(states)).to(device)
-                q_values = self.policy_net(state_tensor)
-                return q_values.argmax(dim=1).tolist()
+        with torch.no_grad():
+            state_tensor = torch.FloatTensor(np.array(states)).to(device)
+            q_values = self.policy_net(state_tensor)
+
+        # Using epsilon as a temperature for softmax distribution for exploration.
+        # A higher epsilon means a higher temperature, which leads to a more uniform probability distribution over actions, encouraging exploration.
+        # A lower epsilon means a lower temperature, resulting in a sharper distribution, favoring exploitation of known good actions.
+        temperature = self.epsilon
+
+        # A small threshold to switch to greedy action selection for numerical stability and to ensure pure exploitation when epsilon is very low.
+        if temperature < 1e-3:
+            return q_values.argmax(dim=1).tolist()
+
+        scaled_q_values = q_values / temperature
+        probs = F.softmax(scaled_q_values, dim=1)
+        actions = torch.multinomial(probs, num_samples=1)
+        return actions.squeeze(1).tolist()
 
     def store_transition(
         self, state: List[float], action: int, reward: float, next_state: List[float], done: bool

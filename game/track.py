@@ -27,7 +27,7 @@ class Track:
             while index < len(self.nodes) - 1:
                 p1 = self.nodes[index]
                 p2 = self.nodes[index + 1]
-                if p1.distance_to(p2) > 100:
+                if p1.distance_to(p2) > 50:
                     # Insert a new node at the midpoint of the segment
                     mid_point = p1.lerp(p2, 0.5)
                     self.nodes.insert(index + 1, mid_point)
@@ -54,7 +54,7 @@ class Track:
             self.outer_points,
             self.inner_points,
             num_rays=5,
-            ray_length=300.0,
+            ray_length=self.width * 5,
             vicinity=10,
         )
 
