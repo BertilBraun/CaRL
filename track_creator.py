@@ -40,6 +40,10 @@ def main() -> None:
                     nodes = []
                     print('Track cleared.')
 
+                if event.key == pygame.K_r:  # Remove last node
+                    nodes.pop()
+                    print('Last node removed.')
+
                 if event.key == pygame.K_s and len(nodes) > 1:  # Save nodes
                     # Print in a copy-paste friendly format
                     print('\n--- Track Nodes ---')
