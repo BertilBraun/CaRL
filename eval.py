@@ -16,6 +16,8 @@ MAX_ITERATIONS = 1000  # Increased to allow more time for completion
 INITIAL_ANGLE_VARIANCE = 5
 EPSILON_FOR_EVALUATION = 0.001
 
+GENERATE_GIFS = True
+
 
 def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface, output_gif_file: str) -> None:
     original_epsilon = agent.epsilon
@@ -60,13 +62,15 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
 
         env.draw(screen, racers)
         pygame.display.flip()
-        frame = pygame.surfarray.array3d(screen).transpose((1, 0, 2))
-        frames.append(frame)
+        if GENERATE_GIFS:
+            frame = pygame.surfarray.array3d(screen).transpose((1, 0, 2))
+            frames.append(frame)
 
     # --- End of Episode ---
-    print('Saving evaluation GIF...')
-    imageio.mimsave(output_gif_file, frames, fps=300)
-    print(f'GIF saved as {output_gif_file}')
+    if GENERATE_GIFS:
+        print('Saving evaluation GIF...')
+        imageio.mimsave(output_gif_file, frames, fps=300)
+        print(f'GIF saved as {output_gif_file}')
 
     finished_racers = [r for r in racers if r.next_checkpoint >= len(env.track.checkpoints) - 1]
     completion_rate = len(finished_racers) / RACERS if RACERS > 0 else 0
