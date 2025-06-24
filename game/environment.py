@@ -92,7 +92,7 @@ class GameEnvironment:
                 racer.done = True  # Mark as finished
                 reward = 1000.0
             else:
-                reward = 50.0
+                reward = 100.0
 
             racer.next_checkpoint += 1
             racer.time_since_checkpoint = 0
@@ -102,11 +102,11 @@ class GameEnvironment:
     def _calculate_reward(
         self, collision: bool, checkpoint_reward: float, progress_reward: float, forward_speed: float
     ) -> float:
-        time_penalty = -0.1
-        speed_reward = forward_speed * 0.01
+        time_penalty = -0.3
+        speed_reward = forward_speed * 0.003
         speed_penalty = -0.5 if forward_speed < 0.1 else 0
         # penalize collision only if it's not a final checkpoint
-        collision_penalty = -100.0 if collision and checkpoint_reward < 100.0 else 0
+        collision_penalty = -200.0 if collision else 0
 
         return collision_penalty + checkpoint_reward + progress_reward + time_penalty + speed_reward + speed_penalty
 

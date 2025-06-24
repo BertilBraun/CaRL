@@ -18,7 +18,7 @@ class Car:
         self.acceleration_rate = 0.3
         self.braking_rate = 0.5
         self.friction = 0.05
-        self.max_steering_angle = 5
+        self.max_steering_angle = 6
 
     def update(self, acceleration_input: float = 0.0, steering_input: float = 0.0) -> None:
         """
