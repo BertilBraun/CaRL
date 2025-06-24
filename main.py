@@ -1,6 +1,9 @@
 import random
+from typing import List, Tuple
 import pygame
 import os
+
+from track import track_nodes
 
 from game.environment import GameEnvironment
 from agent.racer import Racer
@@ -9,33 +12,45 @@ from game.track import Track
 from eval import evaluate_model
 
 
+def setup_screen() -> pygame.Surface:
+    pygame.init()
+    screen_width = 1280
+    screen_height = 720
+    screen = pygame.display.set_mode((screen_width, screen_height))
+    pygame.display.set_caption('Car RL')
+    return screen
+
+
+def setup_environment(track_nodes: List[Tuple[float, float]]) -> GameEnvironment:
+    track = Track(track_nodes)
+    return GameEnvironment(track, timeout_to_do_something=100)
+
+
+def setup_agent(env: GameEnvironment) -> DQNAgent:
+    state_dim = len(env._get_state(Racer(env.track, 0.0)))
+    action_dim = len(env.ACTION_MAP)
+    agent = DQNAgent(state_dim=state_dim, action_dim=action_dim)
+    return agent
+
+
 def main() -> None:
     # --- Config ---
     EPISODES = 1000
     RACERS = 500
     EPISODES_TO_RENDER = 1
-    EPISODES_TO_EVALUATE = [1, 5, 10, 20, 50, 100, 200, 500, 1000]
+    EPISODES_TO_EVALUATE = [1, 5, 10, 20, 50, 100, 200, 350, 500, 750, 1000]
     INITIAL_ANGLE_VARIANCE = 3
     CHECKPOINT_DIR = 'checkpoints'
     CHECKPOINT_FILE = 'dqn_model.pth'
     EVAL_CHECKPOINT_FILE_FORMAT = 'dqn_model_{}.pth'
 
     # --- Setup ---
-    pygame.init()
-    screen_width = 1280
-    screen_height = 720
-    screen = pygame.display.set_mode((screen_width, screen_height))
-    pygame.display.set_caption('Car RL')
+    screen = setup_screen()
 
-    from track import track_nodes
-
-    track = Track(track_nodes)
-    env = GameEnvironment(track, timeout_to_reach_next_checkpoint=100)
+    env = setup_environment(track_nodes)
 
     # --- Agent Setup ---
-    state_dim = len(env._get_state(Racer(track, 0.0)))
-    action_dim = len(env.action_map)
-    agent = DQNAgent(state_dim=state_dim, action_dim=action_dim)
+    agent = setup_agent(env)
 
     # Load existing model if found
     if os.path.exists(os.path.join(CHECKPOINT_DIR, CHECKPOINT_FILE)):
@@ -43,7 +58,9 @@ def main() -> None:
 
     # --- Main Loop ---
     for episode in range(EPISODES):
-        racers = active_racers = [Racer(track, progress_on_track=random.random() * 0.95 + 0.02) for _ in range(RACERS)]
+        racers = active_racers = [
+            Racer(env.track, progress_on_track=random.random() * 0.95 + 0.02) for _ in range(RACERS)
+        ]
 
         # randomly adjust the initial angle by a tiny amount
         for r in racers:
@@ -101,7 +118,7 @@ def main() -> None:
             evaluate_model(agent, env, screen, f'evaluation_{episode}.gif')
 
         # Log results for the episode
-        finished_racers = [r for r in racers if r.next_checkpoint >= len(track.checkpoints) - 1]
+        finished_racers = [r for r in racers if r.next_checkpoint >= len(env.track.checkpoints) - 1]
         avg_reward = sum([r.total_reward for r in racers]) / RACERS if RACERS > 0 else 0
 
         print(

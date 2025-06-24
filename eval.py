@@ -1,14 +1,13 @@
+import os
 import random
 import pygame
-import os
+import imageio
 import numpy as np
 from typing import Dict
-import imageio
 
 from game.environment import GameEnvironment
 from agent.racer import Racer
 from agent.dqn_agent import DQNAgent
-from game.track import Track
 
 # --- Config ---
 RACERS = 100
@@ -100,30 +99,21 @@ if __name__ == '__main__':
     CHECKPOINT_DIR = 'checkpoints'
 
     def main(checkpoint_file: str) -> None:
-        # --- Setup ---
-        pygame.init()
-        screen_width = 1280
-        screen_height = 720
-        screen = pygame.display.set_mode((screen_width, screen_height))
-        pygame.display.set_caption('Car RL - Evaluation')
-
         from track import track_nodes
+        from main import setup_screen, setup_environment, setup_agent
 
-        track = Track(track_nodes)
-        env = GameEnvironment(track, MAX_ITERATIONS)
+        # --- Setup ---
+        screen = setup_screen()
+
+        env = setup_environment(track_nodes)
 
         # --- Agent Setup ---
-        state_dim = len(env._get_state(Racer(track, 0.0)))
-        action_dim = len(env.action_map)
-        agent = DQNAgent(state_dim=state_dim, action_dim=action_dim)
+        agent = setup_agent(env)
 
         # Load existing model
-        model_path = os.path.join(CHECKPOINT_DIR, checkpoint_file)
-        if not os.path.exists(model_path):
-            print(f'Model not found at {model_path}. Exiting.')
+        if not agent.load(CHECKPOINT_DIR, checkpoint_file):
+            print(f'Model not found {checkpoint_file}. Exiting.')
             return
-
-        agent.load(CHECKPOINT_DIR, checkpoint_file)
 
         print('\n--- Starting Evaluation ---')
         output_gif_file = f'evaluation_{checkpoint_file}.gif'

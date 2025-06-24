@@ -2,7 +2,7 @@ from typing import Tuple
 import pygame
 import math
 import numpy as np
-from utils.geometry import get_corners_numba
+from utils.geometry import get_corners_numba, numpy_to_vector
 
 
 class Car:
@@ -63,7 +63,5 @@ class Car:
         screen.blit(rotated_car, rect)
 
         # for debugging
-        # from utils.geometry import numpy_to_vector
-        #
         # for p in self.get_corners_np():
         #     pygame.draw.circle(screen, (0, 0, 0), numpy_to_vector(p), 5)

@@ -19,38 +19,20 @@ class Track:
         self.width = 60
         self.nodes = [pygame.math.Vector2(p) for p in nodes]
 
-        # Continuously add nodes at the halfway point of long segments
-        # until all segments are shorter than 50 units.
-        while True:
-            nodes_added_in_pass = False
-            index = 0
-            while index < len(self.nodes) - 1:
-                p1 = self.nodes[index]
-                p2 = self.nodes[index + 1]
-                if p1.distance_to(p2) > 50:
-                    # Insert a new node at the midpoint of the segment
-                    mid_point = p1.lerp(p2, 0.5)
-                    self.nodes.insert(index + 1, mid_point)
-                    nodes_added_in_pass = True
-                index += 1
-
-            if not nodes_added_in_pass:
-                break
-
         self.outer_points: List[pygame.math.Vector2] = []
         self.inner_points: List[pygame.math.Vector2] = []
         self.checkpoints: List[Tuple[pygame.math.Vector2, pygame.math.Vector2]] = []
 
-        self.segment_lengths: List[float] = []
         self.cumulative_lengths: List[float] = [0.0]
         self.total_length: float = 0.0
 
+        self._ensure_short_segments()
         self._calculate_path_lengths()
         self._generate_track_boundaries()
 
-        self.collision_checker = get_fast_collision_checker(self.checkpoints)
+        self._collision_checker = get_fast_collision_checker(self.checkpoints)
 
-        self.lidar_reader = get_fast_lidar_reader(
+        self._lidar_reader = get_fast_lidar_reader(
             self.outer_points,
             self.inner_points,
             num_rays=5,
@@ -58,74 +40,11 @@ class Track:
             vicinity=10,
         )
 
-    def _calculate_path_lengths(self) -> None:
-        """Calculates the length of each segment and the total path length."""
-        for i in range(len(self.nodes) - 1):
-            p1 = self.nodes[i]
-            p2 = self.nodes[i + 1]
-            length = p1.distance_to(p2)
-            self.segment_lengths.append(length)
-
-        self.total_length = sum(self.segment_lengths)
-
-        # Calculate cumulative lengths for easy lookup
-        cumulative = 0.0
-        for length in self.segment_lengths:
-            cumulative += length
-            self.cumulative_lengths.append(cumulative)
-
-    def _generate_track_boundaries(self) -> None:
-        # Start cap
-        v_start = (self.nodes[1] - self.nodes[0]).normalize()
-        n_start = pygame.math.Vector2(-v_start.y, v_start.x)
-        self.outer_points.append(self.nodes[0] - n_start * self.width / 2)
-        self.inner_points.append(self.nodes[0] + n_start * self.width / 2)
-        self.checkpoints.append((self.inner_points[0], self.outer_points[0]))
-
-        # Intermediate segments
-        for i in range(1, len(self.nodes) - 1):
-            p_curr = self.nodes[i]
-            p_prev = self.nodes[i - 1]
-            p_next = self.nodes[i + 1]
-
-            v_in = (p_curr - p_prev).normalize()
-            v_out = (p_next - p_curr).normalize()
-            n_in = pygame.math.Vector2(v_in.y, -v_in.x)
-            n_out = pygame.math.Vector2(v_out.y, -v_out.x)
-
-            outer1_p1 = p_prev + n_in * self.width / 2
-            outer1_p2 = p_curr + n_in * self.width / 2
-            outer2_p1 = p_curr + n_out * self.width / 2
-            outer2_p2 = p_next + n_out * self.width / 2
-            inner1_p1 = p_prev - n_in * self.width / 2
-            inner1_p2 = p_curr - n_in * self.width / 2
-            inner2_p1 = p_curr - n_out * self.width / 2
-            inner2_p2 = p_next - n_out * self.width / 2
-
-            outer_corner = get_line_segment_intersection(outer1_p1, outer1_p2, outer2_p1, outer2_p2)
-            if outer_corner is None:
-                outer_corner = p_curr + n_in * self.width / 2
-
-            inner_corner = get_line_segment_intersection(inner1_p1, inner1_p2, inner2_p1, inner2_p2)
-            if inner_corner is None:
-                inner_corner = p_curr - n_in * self.width / 2
-
-            self.outer_points.append(outer_corner)
-            self.inner_points.append(inner_corner)
-            self.checkpoints.append((inner_corner, outer_corner))
-
-        # End cap
-        v_end = (self.nodes[-1] - self.nodes[-2]).normalize()
-        n_end = pygame.math.Vector2(-v_end.y, v_end.x)
-        self.outer_points.append(self.nodes[-1] - n_end * self.width / 2)
-        self.inner_points.append(self.nodes[-1] + n_end * self.width / 2)
-        self.checkpoints.append((self.inner_points[-1], self.outer_points[-1]))
-
     def get_lidar_readings(self, car: Car, next_checkpoint: int) -> Tuple[List[float], List[pygame.math.Vector2]]:
-        return self.lidar_reader(car.angle, car.position, next_checkpoint)
+        return self._lidar_reader(car.angle, car.position, next_checkpoint)
 
     def check_collision(self, car: Car, next_checkpoint: int) -> bool:
-        return self.collision_checker(car.get_corners_np(), next_checkpoint)
+        return self._collision_checker(car.get_corners_np(), next_checkpoint)
 
     def get_point_at_fraction(self, fraction: float) -> Tuple[pygame.math.Vector2, float, int]:
         """
@@ -217,3 +136,88 @@ class Track:
             pygame.draw.line(screen, (255, 0, 0), self.outer_points[i], self.outer_points[i + 1], 5)
         for i in range(len(self.inner_points) - 1):
             pygame.draw.line(screen, (255, 0, 0), self.inner_points[i], self.inner_points[i + 1], 5)
+
+    def _ensure_short_segments(self) -> None:
+        """
+        Continuously adds nodes at the halfway point of long segments
+        until all segments are shorter than 50 units.
+        """
+        while True:
+            nodes_added_in_pass = False
+            index = 0
+            while index < len(self.nodes) - 1:
+                p1 = self.nodes[index]
+                p2 = self.nodes[index + 1]
+                if p1.distance_to(p2) > 50:
+                    # Insert a new node at the midpoint of the segment
+                    mid_point = p1.lerp(p2, 0.5)
+                    self.nodes.insert(index + 1, mid_point)
+                    nodes_added_in_pass = True
+                index += 1
+
+            if not nodes_added_in_pass:
+                break
+
+    def _calculate_path_lengths(self) -> None:
+        """Calculates the length of each segment and the total path length."""
+        segment_lengths: List[float] = []
+        for i in range(len(self.nodes) - 1):
+            p1 = self.nodes[i]
+            p2 = self.nodes[i + 1]
+            length = p1.distance_to(p2)
+            segment_lengths.append(length)
+
+        self.total_length = sum(segment_lengths)
+
+        # Calculate cumulative lengths for easy lookup
+        cumulative = 0.0
+        for length in segment_lengths:
+            cumulative += length
+            self.cumulative_lengths.append(cumulative)
+
+    def _generate_track_boundaries(self) -> None:
+        # Start cap
+        v_start = (self.nodes[1] - self.nodes[0]).normalize()
+        n_start = pygame.math.Vector2(-v_start.y, v_start.x)
+        self.outer_points.append(self.nodes[0] - n_start * self.width / 2)
+        self.inner_points.append(self.nodes[0] + n_start * self.width / 2)
+        self.checkpoints.append((self.inner_points[0], self.outer_points[0]))
+
+        # Intermediate segments
+        for i in range(1, len(self.nodes) - 1):
+            p_curr = self.nodes[i]
+            p_prev = self.nodes[i - 1]
+            p_next = self.nodes[i + 1]
+
+            v_in = (p_curr - p_prev).normalize()
+            v_out = (p_next - p_curr).normalize()
+            n_in = pygame.math.Vector2(v_in.y, -v_in.x)
+            n_out = pygame.math.Vector2(v_out.y, -v_out.x)
+
+            outer1_p1 = p_prev + n_in * self.width / 2
+            outer1_p2 = p_curr + n_in * self.width / 2
+            outer2_p1 = p_curr + n_out * self.width / 2
+            outer2_p2 = p_next + n_out * self.width / 2
+            inner1_p1 = p_prev - n_in * self.width / 2
+            inner1_p2 = p_curr - n_in * self.width / 2
+            inner2_p1 = p_curr - n_out * self.width / 2
+            inner2_p2 = p_next - n_out * self.width / 2
+
+            outer_corner = get_line_segment_intersection(outer1_p1, outer1_p2, outer2_p1, outer2_p2)
+            if outer_corner is None:
+                outer_corner = p_curr + n_in * self.width / 2
+
+            inner_corner = get_line_segment_intersection(inner1_p1, inner1_p2, inner2_p1, inner2_p2)
+            if inner_corner is None:
+                inner_corner = p_curr - n_in * self.width / 2
+
+            self.outer_points.append(outer_corner)
+            self.inner_points.append(inner_corner)
+            self.checkpoints.append((inner_corner, outer_corner))
+
+        # End cap
+        v_end = (self.nodes[-1] - self.nodes[-2]).normalize()
+        n_end = pygame.math.Vector2(-v_end.y, v_end.x)
+        self.outer_points.append(self.nodes[-1] - n_end * self.width / 2)
+        self.inner_points.append(self.nodes[-1] + n_end * self.width / 2)
+        self.checkpoints.append((self.inner_points[-1], self.outer_points[-1]))

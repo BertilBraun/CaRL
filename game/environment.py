@@ -1,16 +1,9 @@
 import pygame
 import math
-import numpy as np
 from .track import Track
 from typing import List, Tuple, Dict
 
-from utils.geometry import (
-    find_closest_point_on_segment,
-    get_line_segment_intersection,
-    numpy_to_vector,
-    point_in_polygon_fast,
-    vector_to_numpy,
-)
+from utils.geometry import find_closest_point_on_segment, get_line_segment_intersection
 
 # Guard imports for type-hinting to prevent circular dependencies
 from typing import TYPE_CHECKING
@@ -20,24 +13,25 @@ if TYPE_CHECKING:
 
 
 class GameEnvironment:
-    def __init__(self, track: Track, timeout_to_reach_next_checkpoint: int) -> None:
+    ACTION_MAP: Dict[int, Tuple[float, float]] = {
+        0: (0.0, 0.0),  # coast
+        1: (1.0, 0.0),  # accelerate
+        2: (-1.0, 0.0),  # brake
+        3: (0.0, 1.0),  # steer left
+        4: (0.0, -1.0),  # steer right
+        5: (1.0, 1.0),  # accelerate and steer left
+        6: (1.0, -1.0),  # accelerate and steer right
+        7: (-1.0, 1.0),  # brake + left
+        8: (-1.0, -1.0),  # brake + right
+    }
+
+    def __init__(self, track: Track, timeout_to_do_something: int) -> None:
         self.track = track
-        self.timeout_to_do_something = timeout_to_reach_next_checkpoint
-        self.action_map: Dict[int, Tuple[float, float]] = {
-            0: (0.0, 0.0),  # coast
-            1: (1.0, 0.0),  # accelerate
-            2: (-1.0, 0.0),  # brake
-            3: (0.0, 1.0),  # steer left
-            4: (0.0, -1.0),  # steer right
-            5: (1.0, 1.0),  # accelerate and steer left
-            6: (1.0, -1.0),  # accelerate and steer right
-            7: (-1.0, 1.0),  # brake + left
-            8: (-1.0, -1.0),  # brake + right
-        }
+        self.timeout_to_do_something = timeout_to_do_something
 
     def step(self, racer: 'Racer', action: int) -> Tuple[List[float], float, bool]:
         # Update car physics
-        acceleration_input, steering_input = self.action_map[action]
+        acceleration_input, steering_input = self.ACTION_MAP[action]
         racer.car.update(acceleration_input, steering_input)
 
         # --- Reward Calculation ---
@@ -189,7 +183,7 @@ class GameEnvironment:
 
         for racer in racers:
             # Lerp between red and green based on velocity/max_velocity
-            v = max(0.0, min(1.0, racer.car.velocity / racer.car.max_velocity if racer.car.max_velocity > 0 else 0.0))
+            v = max(0.0, min(1.0, racer.car.velocity / racer.car.max_velocity))
             color = (
                 int(255 * (1 - v)),  # R: 255->0
                 int(255 * (v * 0.5 + 0.5)),  # G: 128->255

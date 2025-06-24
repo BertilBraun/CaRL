@@ -124,11 +124,11 @@ class DQNAgent:
         }
         torch.save(checkpoint, os.path.join(directory, filename))
 
-    def load(self, directory: str, filename: str) -> None:
+    def load(self, directory: str, filename: str) -> bool:
         checkpoint_path = os.path.join(directory, filename)
         if not os.path.exists(checkpoint_path):
             print(f'Checkpoint not found at {checkpoint_path}. Starting new training.')
-            return
+            return False
 
         checkpoint = torch.load(checkpoint_path)
         self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
@@ -137,3 +137,4 @@ class DQNAgent:
         self.epsilon = checkpoint['epsilon']
 
         print(f'Loaded model and optimizer state from {checkpoint_path}')
+        return True
