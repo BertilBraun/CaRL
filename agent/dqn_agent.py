@@ -39,9 +39,9 @@ class DQNAgent:
 
         self.batch_size = 64
         self.gamma = 0.99
-        self.epsilon_start = 0.2
+        self.epsilon_start = 0.1
         self.epsilon_end = 0.03
-        self.epsilon_decay = 0.99
+        self.epsilon_decay = 0.999
         self.epsilon = self.epsilon_start
 
         self.target_update = 2

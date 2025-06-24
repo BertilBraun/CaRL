@@ -11,9 +11,9 @@ from game.track import Track
 def main() -> None:
     # --- Config ---
     EPISODES = 1000
-    RACERS = 200
+    RACERS = 500
     MAX_ITERATIONS = 500
-    EPISODES_TO_RENDER = 10
+    EPISODES_TO_RENDER = 1
     CHECKPOINT_DIR = 'checkpoints'
     CHECKPOINT_FILE = 'dqn_model.pth'
 
@@ -77,7 +77,7 @@ def main() -> None:
                     if event.type == pygame.QUIT:
                         exit()
 
-                env.draw(screen, racers)
+                env.draw(screen, racers[::10])
                 pygame.display.flip()
                 clock.tick(60)
 

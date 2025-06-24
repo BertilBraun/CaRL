@@ -16,5 +16,11 @@ class Racer:
         self.total_reward = 0.0
         self.done = False
         self.last_pos = self.car.position.copy()
-        self.time_since_checkpoint = 0
         self.current_state: List[float] = []
+
+        # Checkpoint detection
+        self.time_since_checkpoint = 0
+
+        # Stalled detection
+        self.last_pos_in_timeout = self.car.position.copy()
+        self.time_since_last_pos_change = 0

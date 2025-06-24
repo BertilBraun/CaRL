@@ -13,9 +13,8 @@ if TYPE_CHECKING:
 
 
 class GameEnvironment:
-    MIN_PROGRESS_THRESHOLD = 0.001
-    STALLED_WINDOW = 30
-    MAX_STALLED_TIME = 60
+    MIN_PROGRESS_THRESHOLD = 0.1
+    MAX_STALLED_TIME = 20
 
     def __init__(self, track: Track, timeout_to_reach_next_checkpoint: int) -> None:
         self.track = track
@@ -62,6 +61,16 @@ class GameEnvironment:
 
         # Update racer state for the next step
         racer.last_pos = racer.car.position.copy()
+        racer.time_since_last_pos_change += 1
+
+        if racer.last_pos_in_timeout.distance_to(racer.car.position) > self.MIN_PROGRESS_THRESHOLD:
+            racer.time_since_last_pos_change = 0
+            racer.last_pos_in_timeout = racer.car.position.copy()
+
+        if racer.time_since_last_pos_change > self.MAX_STALLED_TIME:
+            done = True
+            reward = -200.0
+
         racer.time_since_checkpoint += 1
 
         if racer.time_since_checkpoint > self.timeout_to_reach_next_checkpoint:
@@ -102,7 +111,7 @@ class GameEnvironment:
             return -100.0
 
         time_penalty = -0.1
-        speed_reward = forward_speed * 0.05
+        speed_reward = forward_speed * 0.01
         speed_penalty = -0.5 if forward_speed < 0.1 else 0
 
         return checkpoint_reward + progress_reward + time_penalty + speed_reward + speed_penalty
