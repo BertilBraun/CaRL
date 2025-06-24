@@ -42,7 +42,7 @@ def main() -> None:
 
     # --- Main Loop ---
     for episode in range(EPISODES):
-        racers = active_racers = [Racer(track, progress_on_track=random.random() * 0.8 + 0.05) for _ in range(RACERS)]
+        racers = active_racers = [Racer(track, progress_on_track=random.random() * 0.8 + 0.01) for _ in range(RACERS)]
         for r in racers:
             r.current_state = env._get_state(r)
 

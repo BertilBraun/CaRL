@@ -47,8 +47,8 @@ class DQNAgent:
         # | **0.995–0.999** | Several hundred to a few thousand steps                                         |
 
         self.epsilon_start = 0.4
-        self.epsilon_end = 0.01
-        self.epsilon_decay = 0.995
+        self.epsilon_end = 0.02
+        self.epsilon_decay = 0.99
         self.epsilon = self.epsilon_start
         # Epsilon is the probability of taking a random action which is used to explore the environment
         # The epsilon is decayed over time to epsilon_end to gradually reduce the exploration

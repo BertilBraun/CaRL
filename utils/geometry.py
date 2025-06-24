@@ -105,7 +105,7 @@ def get_fast_collision_checker(
 
     @numba.njit(fastmath=True, cache=True)
     def check_collision_fast(car_points: np.ndarray, next_checkpoint: int) -> bool:
-        window_size = 5
+        window_size = 6
         start_idx = max(0, next_checkpoint - window_size)
         end_idx = min(num_checkpoints - 1, next_checkpoint + window_size)
 

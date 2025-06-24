@@ -14,11 +14,11 @@ class Car:
         # Default car properties
         self.length = 40
         self.width = 20
-        self.max_velocity = 10
-        self.acceleration_rate = 0.3
+        self.max_velocity = 8
+        self.acceleration_rate = 0.2
         self.braking_rate = 0.5
         self.friction = 0.05
-        self.max_steering_angle = 6
+        self.max_steering_angle = 5
 
     def update(self, acceleration_input: float = 0.0, steering_input: float = 0.0) -> None:
         """
@@ -66,5 +66,7 @@ class Car:
         screen.blit(rotated_car, rect)
 
         # for debugging
-        # for p in self.get_corners_np():
-        #     pygame.draw.circle(screen, (0, 0, 0), numpy_to_vector(p), 5)
+        from utils.geometry import numpy_to_vector
+
+        for p in self.get_corners_np():
+            pygame.draw.circle(screen, (0, 0, 0), numpy_to_vector(p), 5)

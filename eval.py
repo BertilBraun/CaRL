@@ -21,7 +21,7 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
     agent.epsilon = EPSILON_FOR_EVALUATION  # Disable randomness almost completely for evaluation
 
     # Start all racers at the beginning of the track
-    racers = active_racers = [Racer(env.track, progress_on_track=0.05) for _ in range(RACERS)]
+    racers = active_racers = [Racer(env.track, progress_on_track=0.01) for _ in range(RACERS)]
 
     # randomly adjust the initial angle by a tiny amount
     for r in racers:

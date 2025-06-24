@@ -13,9 +13,6 @@ if TYPE_CHECKING:
 
 
 class GameEnvironment:
-    MIN_PROGRESS_THRESHOLD = 0.1
-    MAX_STALLED_TIME = 20
-
     def __init__(self, track: Track, timeout_to_reach_next_checkpoint: int) -> None:
         self.track = track
         self.timeout_to_reach_next_checkpoint = timeout_to_reach_next_checkpoint
