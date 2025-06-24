@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 def _check_collision_fast(
     car_points: np.ndarray, checkpoints_np: np.ndarray, num_checkpoints: int, next_checkpoint: int
 ) -> bool:
-    window_size = 4
+    window_size = 5
     start_idx = max(0, next_checkpoint - window_size)
     end_idx = min(num_checkpoints - 1, next_checkpoint + window_size)
 
@@ -111,14 +111,14 @@ class Track:
     def _get_track_lines(self) -> np.ndarray:
         lines = []
         # Outer boundary lines
-        for i in range(len(self.outer_points_np)):
-            p1 = self.outer_points_np[i - 1]
-            p2 = self.outer_points_np[i]
+        for i in range(len(self.outer_points_np) - 1):
+            p1 = self.outer_points_np[i]
+            p2 = self.outer_points_np[i + 1]
             lines.append([p1, p2])
         # Inner boundary lines
-        for i in range(len(self.inner_points_np)):
-            p1 = self.inner_points_np[i - 1]
-            p2 = self.inner_points_np[i]
+        for i in range(len(self.inner_points_np) - 1):
+            p1 = self.inner_points_np[i]
+            p2 = self.inner_points_np[i + 1]
             lines.append([p1, p2])
 
         return np.array(lines, dtype=np.float32)
@@ -265,8 +265,5 @@ class Track:
 
         # for debugging
         # draw all track boundaries
-        # for i in range(len(self.outer_points) - 1):
-        #     pygame.draw.line(screen, (255, 0, 0), self.outer_points[i], self.outer_points[i + 1], 5)
-        #
-        # for i in range(len(self.inner_points) - 1):
-        #     pygame.draw.line(screen, (255, 0, 0), self.inner_points[i], self.inner_points[i + 1], 5)
+        for tr in self.track_lines_np:
+            pygame.draw.line(screen, (255, 0, 0), numpy_to_vector(tr[0]), numpy_to_vector(tr[1]), 5)

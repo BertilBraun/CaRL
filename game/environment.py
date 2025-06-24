@@ -112,7 +112,7 @@ class GameEnvironment:
         self, collision: bool, checkpoint_reward: float, progress_reward: float, forward_speed: float
     ) -> float:
         time_penalty = -0.1
-        speed_reward = forward_speed * 0.003
+        speed_reward = forward_speed * 0.01
         speed_penalty = -0.5 if forward_speed < 0.1 else 0
         # penalize collision only if it's not a final checkpoint
         collision_penalty = -100.0 if collision and checkpoint_reward < 100.0 else 0
