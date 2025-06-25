@@ -115,5 +115,6 @@ dmypy.json
 
 
 **/*.pth
+**/*.gif
 
 !documentation/**
