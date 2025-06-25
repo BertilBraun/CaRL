@@ -16,13 +16,13 @@ The videos below demonstrate the agent's performance. The training video shows m
 
 ![Evaluation](documentation/evaluation.gif)
 
-The evaluation video shows 100 racers per iteration driving with slight offsets in the initial angle to show variation in the agent's performance. The evaluation episodes are 1, 5, 10, 20, 50, 100, 200, and 350.
+The evaluation video shows 100 racers per iteration driving with slight offsets in the initial angle to show variation in the agent's performance. The evaluation episodes are 1, 5, 10, 20, 50, 100, 200, and 350 colored from red to green based on the episodes number.
 
 ### Training
 
 ![Training](documentation/train_100_200_500.gif)
 
-The training video shows 100 parallel racers learning simultaneously, starting from random points on the track and added noise to the actions to improve generalization. The training episodes are 100, 200, and 500.
+The training video shows 100 parallel racers learning simultaneously, starting from random points on the track and added noise to the actions to improve generalization. The training episodes are 100, 200, and 500. The racers are colored from orange to green based on how fast they are driving and are colored red if they died/collided.
 
 ## Core Features
 
