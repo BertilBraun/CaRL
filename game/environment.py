@@ -123,7 +123,7 @@ class GameEnvironment:
         if racer.time_since_checkpoint > self.timeout_to_do_something:
             return True, -100.0  # Penalty for being too slow
         if racer.time_since_last_movement > self.timeout_to_do_something:
-            return True, -500.0  # Penalty for getting stuck
+            return True, -800.0  # Penalty for getting stuck
 
         return False, 0.0
 

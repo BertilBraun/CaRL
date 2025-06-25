@@ -37,8 +37,8 @@ def main() -> None:
     # --- Config ---
     EPISODES = 1000
     RACERS = 500
-    EPISODES_TO_RENDER = 1
-    EPISODES_TO_EVALUATE = [1, 5, 10, 20, 50, 100, 200, 350, 500, 750, 1000]
+    EPISODES_TO_RENDER = 2
+    EPISODES_TO_EVALUATE = [5, 10, 20, 50, 100, 200, 350, 500, 750, 1000]
     INITIAL_ANGLE_VARIANCE = 3
     CHECKPOINT_DIR = 'checkpoints'
     CHECKPOINT_FILE = 'dqn_model.pth'
@@ -59,7 +59,7 @@ def main() -> None:
     # --- Main Loop ---
     for episode in range(EPISODES):
         racers = active_racers = [
-            Racer(env.track, progress_on_track=random.random() * 0.95 + 0.02) for _ in range(RACERS)
+            Racer(env.track, progress_on_track=random.random() * 0.95 + 0.01) for _ in range(RACERS)
         ]
 
         # randomly adjust the initial angle by a tiny amount
@@ -107,9 +107,6 @@ def main() -> None:
 
         # --- End of Episode ---
         agent.decay_epsilon()
-        if episode > 0 and episode % agent.target_update == 0:
-            agent.update_target_net()
-
         agent.save(CHECKPOINT_DIR, CHECKPOINT_FILE)
 
         if episode in EPISODES_TO_EVALUATE:

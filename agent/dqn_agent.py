@@ -36,7 +36,7 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=0.001)
-        self.memory: Deque[Tuple[List[float], int, float, List[float], bool]] = deque(maxlen=50_000)
+        self.memory: Deque[Tuple[List[float], int, float, List[float], bool]] = deque(maxlen=20_000)
 
         self.batch_size = 256
 
@@ -54,7 +54,8 @@ class DQNAgent:
         # Epsilon is the probability of taking a random action which is used to explore the environment
         # The epsilon is decayed over time to epsilon_end to gradually reduce the exploration
 
-        self.target_update = 10
+        self.target_update = 500
+        self.time_step = 0
         # The target network is updated every target_update steps, to make the policy network more stable
 
     def select_actions(self, states: List[List[float]]) -> List[int]:
@@ -79,7 +80,7 @@ class DQNAgent:
     def store_transition(
         self, state: List[float], action: int, reward: float, next_state: List[float], done: bool
     ) -> None:
-        self.memory.append((state, action, reward, next_state, done))
+        self.memory.append((state, action, reward / 10, next_state, done))
 
     def experience_replay(self) -> None:
         if len(self.memory) < self.batch_size:
@@ -107,7 +108,11 @@ class DQNAgent:
         loss.backward()
         self.optimizer.step()
 
-    def update_target_net(self) -> None:
+        self.time_step += 1
+        if self.time_step % self.target_update == 0:
+            self._update_target_net()
+
+    def _update_target_net(self) -> None:
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def decay_epsilon(self) -> None:

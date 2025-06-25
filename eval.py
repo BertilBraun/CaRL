@@ -67,7 +67,7 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
     # --- End of Episode ---
     if GENERATE_GIFS:
         print('Saving evaluation GIF...')
-        imageio.mimsave(output_gif_file, frames, fps=300)
+        imageio.mimsave(output_gif_file, frames[::3], fps=300)
         print(f'GIF saved as {output_gif_file}')
 
     finished_racers = [r for r in racers if r.next_checkpoint >= len(env.track.checkpoints) - 1]
