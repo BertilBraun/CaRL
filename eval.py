@@ -14,7 +14,7 @@ MAX_ITERATIONS = 1000  # Increased to allow more time for completion
 INITIAL_ANGLE_VARIANCE = 5
 EPSILON_FOR_EVALUATION = 0.001
 
-GENERATE_GIFS = True
+GENERATE_GIFS = False
 
 
 def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface, output_gif_file: str) -> None:

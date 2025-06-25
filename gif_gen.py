@@ -102,5 +102,5 @@ if __name__ == '__main__':
 
         pygame.quit()
 
-    checkpoint_files = [f'dqn_model_{i}.pth' for i in (1, 5, 10, 20, 50, 100, 200, 350)]
+    checkpoint_files = [f'dqn_model_{i}.pth' for i in (1, 5, 10, 20, 50, 100, 200, 350, 500)]
     main(checkpoint_files)

@@ -37,6 +37,7 @@ def main() -> None:
     # --- Config ---
     EPISODES = 1000
     RACERS = 500
+    MAX_ITERATIONS = 200
     EPISODES_TO_RENDER = 2
     EPISODES_TO_EVALUATE = [5, 10, 20, 50, 100, 200, 350, 500, 750, 1000]
     INITIAL_ANGLE_VARIANCE = 3
@@ -69,7 +70,7 @@ def main() -> None:
         for r in racers:
             r.current_state = env.get_state(r)
 
-        while active_racers:
+        for _ in range(MAX_ITERATIONS):
             # --- Agent-Environment Interaction ---
             # 1. Get states from all active racers
             states = [r.current_state for r in active_racers]
@@ -90,11 +91,15 @@ def main() -> None:
                 if racer.car.velocity > 1.0 or racer.done:
                     agent.store_transition(prev_state, action, reward, next_state, racer.done)
 
-            # prepare active racers for next iteration
-            active_racers = [r for r in active_racers if not r.done]
-
             # 4. Perform one step of learning
             agent.experience_replay()
+
+            # 5. prepare active racers for next iteration
+            active_racers = [r for r in active_racers if not r.done]
+
+            # 6. check if all racers are done
+            if not active_racers:
+                break
 
             # --- Rendering ---
             if EPISODES_TO_RENDER > 0 and episode % EPISODES_TO_RENDER == 0:
@@ -102,7 +107,7 @@ def main() -> None:
                     if event.type == pygame.QUIT:
                         exit()
 
-                env.draw(screen, racers[::20])
+                env.draw(screen, racers[::10])
                 pygame.display.flip()
 
         # --- End of Episode ---
