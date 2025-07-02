@@ -28,6 +28,7 @@ The training video shows 100 parallel racers learning simultaneously, starting f
 
 - **Modular Track System**: Easily define complex racetracks by specifying a series of centerline nodes. A visual `track_creator.py` script is included to facilitate the creation of custom tracks.
 - **Deep Q-Network (DQN) Agent**: A DQN agent learns to navigate the track from scratch. The agent uses an experience replay buffer and a target network for stable learning.
+- **Advanced Exploration Strategy**: Uses a novel epsilon-temperature softmax approach for efficient exploration. See [exploration.md](documentation/exploration.md) for detailed analysis.
 - **Parallelized Simulation**: The training architecture supports running hundreds of simulations in parallel. All racers share a single "brain," contributing their experiences to a shared replay buffer, which significantly speeds up learning.
 - **Headless & Visual Modes**: Train the agent at maximum speed in headless mode or enable rendering to visually inspect the training process. The evaluation script can also export the agent's performance as a GIF.
 - **Typed Codebase**: The project is fully type-hinted for improved clarity, robustness, and maintainability.
@@ -37,23 +38,27 @@ The training video shows 100 parallel racers learning simultaneously, starting f
 Documentation can be found here: [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/BertilBraun/CaRL)
 
 ### State Representation
+
 The agent perceives its environment through a state vector containing:
-1.  **LIDAR Readings**: A set of distance measurements to the track boundaries, simulating LIDAR sensors.
-2.  **Normalized Forward Speed**: The car's velocity component in the direction of the next checkpoint.
-3.  **Normalized Distance to Centerline**: The car's perpendicular distance from the track's centerline.
-4.  **Normalized Angle to Centerline**: The car's heading relative to the direction of the centerline.
+
+1. **LIDAR Readings**: A set of distance measurements to the track boundaries, simulating LIDAR sensors.
+2. **Normalized Forward Speed**: The car's velocity component in the direction of the next checkpoint.
+3. **Normalized Distance to Centerline**: The car's perpendicular distance from the track's centerline.
+4. **Normalized Angle to Centerline**: The car's heading relative to the direction of the centerline.
 
 ### Reward Function
+
 The reward function is designed to encourage fast and efficient driving along the track's centerline.
+
 - **Positive Rewards**:
-    - **Progress**: The primary reward is proportional to the distance covered along the centerline towards the next checkpoint.
-    - **Checkpoint Crossing**: A fixed reward of `+10` is given for crossing a checkpoint.
-    - **Finishing the Lap**: A large reward of `+1000` is given for successfully completing the track.
+  - **Progress**: The primary reward is proportional to the distance covered along the centerline towards the next checkpoint.
+  - **Checkpoint Crossing**: A fixed reward of `+10` is given for crossing a checkpoint.
+  - **Finishing the Lap**: A large reward of `+1000` is given for successfully completing the track.
 - **Penalties (Negative Rewards)**:
-    - **Time Penalty**: A small penalty of `-0.2` is applied at every step to encourage speed.
-    - **Crashing**: A large penalty of `-500` is given if the car collides with the track boundaries.
-    - **Getting Stuck**: A penalty of `-500` is applied if the car stops moving for an extended period.
-    - **Stagnation**: A penalty of `-100` is given if the car takes too long to reach the next checkpoint.
+  - **Time Penalty**: A small penalty of `-0.2` is applied at every step to encourage speed.
+  - **Crashing**: A large penalty of `-500` is given if the car collides with the track boundaries.
+  - **Getting Stuck**: A penalty of `-500` is applied if the car stops moving for an extended period.
+  - **Stagnation**: A penalty of `-100` is given if the car takes too long to reach the next checkpoint.
 
 To prevent overfitting and improve generalization, each racer in a training episode starts at a random position along the track's centerline.
 
@@ -66,6 +71,7 @@ To prevent overfitting and improve generalization, each racer in a training epis
 ---
 
 ### Open Todos & Next Steps
+
 - [ ] **Reward Shaping**: Experiment with more advanced reward functions to encourage more complex behaviors (e.g., rewarding speed, penalizing jerky movements, following a racing line).
 - [ ] **Advanced Agent Architectures**: Explore more advanced RL algorithms beyond DQN, such as Dueling DQN or PPO.
 - [ ] **UI/Dashboard**: Create a simple dashboard to display training metrics like average reward, episode length, and epsilon value in real-time.
