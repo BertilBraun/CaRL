@@ -3,6 +3,7 @@ from typing import List, Tuple
 import pygame
 import os
 
+from game.car import Car
 from track import track_nodes
 
 from game.environment import GameEnvironment
@@ -27,7 +28,7 @@ def setup_environment(track_nodes: List[Tuple[float, float]]) -> GameEnvironment
 
 
 def setup_agent(env: GameEnvironment) -> DQNAgent:
-    state_dim = len(env.get_state(Racer(env.track, 0.0)))
+    state_dim = len(env.get_state(Racer(env.track, 0.0, 0.0, 0.0)))
     action_dim = len(env.ACTION_MAP)
     agent = DQNAgent(state_dim=state_dim, action_dim=action_dim)
     return agent
@@ -60,12 +61,14 @@ def main() -> None:
     # --- Main Loop ---
     for episode in range(EPISODES):
         racers = active_racers = [
-            Racer(env.track, progress_on_track=random.random() * 0.95 + 0.01) for _ in range(RACERS)
+            Racer(
+                env.track,
+                progress_on_track=random.random() * 0.95 + 0.01,
+                initial_velocity=random.random() * Car.max_velocity,
+                initial_angle_variance=INITIAL_ANGLE_VARIANCE,
+            )
+            for _ in range(RACERS)
         ]
-
-        # randomly adjust the initial angle by a tiny amount
-        for r in racers:
-            r.car.angle += random.uniform(-INITIAL_ANGLE_VARIANCE, INITIAL_ANGLE_VARIANCE)
 
         for r in racers:
             r.current_state = env.get_state(r)

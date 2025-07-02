@@ -1,4 +1,3 @@
-import random
 import pygame
 import imageio
 import numpy as np
@@ -22,11 +21,10 @@ def evaluate_model(agent: DQNAgent, env: GameEnvironment, screen: pygame.Surface
     agent.epsilon = EPSILON_FOR_EVALUATION  # Disable randomness almost completely for evaluation
 
     # Start all racers at the beginning of the track
-    racers = active_racers = [Racer(env.track, progress_on_track=0.02) for _ in range(RACERS)]
-
-    # randomly adjust the initial angle by a tiny amount
-    for r in racers:
-        r.car.angle += random.uniform(-INITIAL_ANGLE_VARIANCE, INITIAL_ANGLE_VARIANCE)
+    racers = active_racers = [
+        Racer(env.track, progress_on_track=0.02, initial_velocity=0.0, initial_angle_variance=INITIAL_ANGLE_VARIANCE)
+        for _ in range(RACERS)
+    ]
 
     racer_iterations: Dict[Racer, int] = {r: 0 for r in racers}
     for r in racers:

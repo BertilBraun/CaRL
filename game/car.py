@@ -6,19 +6,19 @@ from utils.geometry import get_corners_numba, numpy_to_vector
 
 
 class Car:
-    def __init__(self, x: float, y: float, angle: float = 0.0) -> None:
-        self.position = pygame.math.Vector2(x, y)
-        self.velocity = 0.0
-        self.angle = angle
+    # Default car properties
+    length = 40
+    width = 20
+    max_velocity = 15
+    acceleration_rate = 0.5
+    braking_rate = 1.2
+    friction = 0.05
+    max_steering_angle = 10
 
-        # Default car properties
-        self.length = 40
-        self.width = 20
-        self.max_velocity = 15
-        self.acceleration_rate = 0.5
-        self.braking_rate = 1.2
-        self.friction = 0.05
-        self.max_steering_angle = 10
+    def __init__(self, x: float, y: float, angle: float = 0.0, velocity: float = 0.0) -> None:
+        self.position = pygame.math.Vector2(x, y)
+        self.velocity = velocity
+        self.angle = angle
 
     def update(self, acceleration_input: float = 0.0, steering_input: float = 0.0) -> None:
         """
