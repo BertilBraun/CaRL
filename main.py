@@ -39,8 +39,9 @@ def main() -> None:
     EPISODES = 1000
     RACERS = 500
     MAX_ITERATIONS = 200
-    EPISODES_TO_RENDER = 2
-    EPISODES_TO_EVALUATE = [5, 10, 20, 50, 100, 200, 350, 500, 750, 1000]
+    # Set to 0 to disable, set to higher value to render less often, each episode skipped is ~20% faster
+    EPISODES_TO_RENDER = 1
+    EPISODES_TO_EVALUATE = [5, 10, 20, 50, 100, 150, 200, 350, 500, 750, 1000]
     INITIAL_ANGLE_VARIANCE = 3
     CHECKPOINT_DIR = 'checkpoints'
     CHECKPOINT_FILE = 'dqn_model.pth'
@@ -64,7 +65,7 @@ def main() -> None:
             Racer(
                 env.track,
                 progress_on_track=random.random() * 0.95 + 0.01,
-                initial_velocity=random.random() * Car.max_velocity,
+                initial_velocity=(random.random() * 0.5 + 0.5) * Car.max_velocity,
                 initial_angle_variance=INITIAL_ANGLE_VARIANCE,
             )
             for _ in range(RACERS)
